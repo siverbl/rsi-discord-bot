@@ -680,9 +680,8 @@ async def list_subscriptions(
         for sub in under_subs:
             instrument = bot.catalog.get_instrument(sub.ticker)
             name = instrument.name if instrument else sub.ticker
-            status = "✅" if sub.enabled else "⏸️"
             lines.append(
-                f"{status} `{sub.id}` — **{sub.ticker}** ({name}) "
+                f"`{sub.id}` — **{sub.ticker}** ({name}) "
                 f"| RSI{sub.period} < {sub.threshold}"
             )
         lines.append("")
@@ -692,9 +691,8 @@ async def list_subscriptions(
         for sub in over_subs:
             instrument = bot.catalog.get_instrument(sub.ticker)
             name = instrument.name if instrument else sub.ticker
-            status = "✅" if sub.enabled else "⏸️"
             lines.append(
-                f"{status} `{sub.id}` — **{sub.ticker}** ({name}) "
+                f"`{sub.id}` — **{sub.ticker}** ({name}) "
                 f"| RSI{sub.period} > {sub.threshold}"
             )
         lines.append("")
