@@ -1,0 +1,18 @@
+# Discord bot framework
+discord.py>=2.3.0
+
+# Finance data
+yfinance>=0.2.40
+pandas>=2.0.0
+
+# Scheduling
+APScheduler>=3.10.0
+
+# Timezone support
+pytz>=2024.1
+
+# Async SQLite
+aiosqlite>=0.19.0
+
+# HTTP client for health checks
+aiohttp>=3.9.0

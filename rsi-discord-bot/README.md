@@ -1,0 +1,358 @@
+# RSI Discord Bot
+
+A Discord bot that monitors stock RSI (Relative Strength Index) levels and sends alerts when stocks cross configured thresholds. Designed for Norwegian stocks with Nordnet integration.
+
+## Features
+
+- **RSI Alerts**: Get notified when stocks cross oversold (RSI < 30) or overbought (RSI > 70) thresholds
+- **Crossing Detection**: Smart alert system that only triggers when RSI crosses a threshold (not every day it stays beyond)
+- **Fixed Alert Channels**: Alerts automatically route to `#rsi-oversold` and `#rsi-overbought`
+- **Slash Commands**: Modern Discord slash command interface
+- **Server-wide Alerts**: All alerts are visible to everyone in the server
+- **Persistent Storage**: SQLite database survives bot restarts
+- **Cooldown System**: Prevents alert spam with configurable cooldown periods
+- **Batch Processing**: Efficiently handles 300-500 tickers with batched API calls
+- **Nordnet Links**: Alert messages include clickable links to Nordnet
+
+## Quick Start
+
+### 1. Prerequisites
+
+- Python 3.10+
+- A Discord Bot Token ([Create one here](https://discord.com/developers/applications))
+- `tickers.csv` file with your stock list
+- **Two channels in your Discord server:**
+  - `#rsi-oversold` — for UNDER alerts (oversold signals)
+  - `#rsi-overbought` — for OVER alerts (overbought signals)
+
+### 2. Installation
+
+```bash
+# Clone or download the bot
+cd rsi-discord-bot
+
+#Only for Raspberry Pi OS 32-bit lite
+sudo apt update
+sudo apt install -y python3 python3-pip python3-venv git
+
+# Create virtual environment (recommended)
+python3 -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+
+# Install dependencies
+python3 -m pip install -r requirements.tx
+```
+
+On Raspberry Pi OS 32-bit, pip typically uses piwheels, which provides prebuilt wheels for numpy/pandas.
+```bash
+# If numpy/pandas install complains about BLAS/Fortran libs, add:
+sudo apt install -y libgfortran5 libopenblas0-pthread
+
+#If installs are compiling or failing, try:
+python3 -m pip install --upgrade pip
+python3 -m pip install --extra-index-url https://www.piwheels.org/simple -r requirements.txt
+```
+### 3. Configuration
+
+Set your Discord bot token:
+
+```bash
+export DISCORD_TOKEN=your_bot_token_here
+```
+
+### 4. Run the Bot
+
+```bash
+python3 main.py
+```
+
+## Slash Commands
+
+| Command | Description | Required Permissions |
+|---------|-------------|---------------------|
+| `/subscribe` | Create an RSI alert subscription | None |
+| `/subscribe-bands` | Create both oversold and overbought alerts | None |
+| `/unsubscribe` | Remove your own subscription by ID | None |
+| `/unsubscribe-all` | Remove all your subscriptions | None |
+| `/admin-unsubscribe` | Remove any subscription (logged) | Administrator |
+| `/list` | List all subscriptions (with optional ticker filter) | None |
+| `/run-now` | Manually trigger RSI check | Manage Server |
+| `/set-defaults` | Configure server defaults | Manage Server |
+| `/ticker-info` | Look up a ticker (shows RSI, subscriptions) | None |
+| `/catalog-stats` | Show catalog and subscription statistics | None |
+| `/reload-catalog` | Reload tickers.csv | Administrator |
+| `/server-status` | Check server status | None |
+| `/schedule-restart` | Schedule a server restart | Administrator |
+| `/schedule-shutdown` | Schedule a server shutdown | Administrator |
+| `/cancel-scheduled-action` | Cancel scheduled restart/shutdown | Administrator |
+
+### Command Examples
+
+**Create a subscription:**
+```
+/subscribe ticker:EQNR.OL condition:under threshold:30
+```
+
+**Create both oversold and overbought alerts:**
+```
+/subscribe-bands ticker:YAR.OL oversold:30 overbought:70
+```
+
+**List all subscriptions:**
+```
+/list
+```
+
+**List subscriptions for a specific ticker:**
+```
+/list ticker:EQNR.OL
+```
+
+**Get detailed info about a ticker (including RSI and subscriptions):**
+```
+/ticker-info ticker:EQNR.OL
+```
+
+**Remove a subscription:**
+```
+/unsubscribe id:5
+```
+
+**Remove all your subscriptions:**
+```
+/unsubscribe-all
+```
+
+**View statistics:**
+```
+/catalog-stats
+```
+
+## Alert Channels
+
+The bot uses **two fixed channels** for alerts (no channel selection needed):
+
+| Channel | Alert Type | Sorting |
+|---------|------------|---------|
+| `#rsi-oversold` | UNDER alerts | Lowest RSI first |
+| `#rsi-overbought` | OVER alerts | Highest RSI first |
+
+**Important:** Create these channels before using the bot. The bot will show an error if they don't exist.
+
+## Alert Message Format
+
+Alerts use a numbered list format with clickable Nordnet links:
+
+```
+📈 **RSI Overbought Alerts**
+
+1) **AUSS.OL** — [Austevoll Seafood](https://www.nordnet.no/aksjer/kurser/austevoll-seafood-auss-xosl) — RSI14: **79.6** | Rule: **> 70.0** | ⏱️ **day 4**
+2) **NHY.OL** — [Norsk Hydro](https://www.nordnet.no/aksjer/kurser/norsk-hydro-nhy-xosl) — RSI14: **78.3** | Rule: **> 70.0** | 🆕 **just crossed**
+```
+
+- **🆕 just crossed** — First day the condition is met
+- **⏱️ day N** — Consecutive trading days the condition has been met
+
+## Configuration
+
+### tickers.csv
+
+The `tickers.csv` file is the source of truth for valid tickers. Format:
+
+```csv
+ticker,name,nordnet_slug
+YAR.OL,Yara International ASA,yara-international-yar-xosl
+EQNR.OL,Equinor ASA,equinor-eqnr-xosl
+```
+
+- `ticker`: Yahoo Finance ticker symbol (e.g., `*.OL` for Oslo)
+- `name`: Company display name for alerts
+- `nordnet_slug`: URL slug for Nordnet links
+
+### Ticker Format Limits
+
+**There are no artificial limits** on ticker symbol format beyond:
+- Must exist in `tickers.csv` (the instrument catalog)
+- Must be valid for Yahoo Finance (the upstream data source)
+- Practical maximum ~20 characters (Yahoo Finance limit)
+- Allowed characters: letters, numbers, `.`, `-`, `^` (as accepted by Yahoo Finance)
+
+### Server Defaults
+
+Admins can configure server defaults with `/set-defaults`:
+
+- **default_period**: RSI period (default: 14)
+- **default_cooldown**: Hours between repeated alerts (default: 24)
+- **schedule_time**: Daily check time in HH:MM (default: 18:30, Europe/Oslo)
+- **alert_mode**: `CROSSING` (default) or `LEVEL`
+- **hysteresis**: Buffer to prevent threshold bouncing (default: 2.0)
+
+## Alert System
+
+### Alert Modes
+
+**CROSSING (default)**
+- Only alerts when RSI *crosses* a threshold
+- UNDER 30: Triggers when RSI goes from ≥30 to <30
+- OVER 70: Triggers when RSI goes from ≤70 to >70
+- Prevents daily repeated alerts when RSI stays beyond threshold
+
+**LEVEL**
+- Alerts whenever the condition is met
+- Will alert every day RSI is beyond threshold (subject to cooldown)
+
+### Cooldown
+
+After an alert fires, it won't fire again for the same subscription until the cooldown period passes (default 24 hours).
+
+### Persistence Counter
+
+The bot tracks **consecutive trading days** that a stock meets the condition:
+- `🆕 just crossed` — First day
+- `⏱️ day N` — Number of consecutive trading days
+
+## Database Schema
+
+The bot uses SQLite with three tables:
+
+### guild_config
+Server-level settings including defaults for RSI period, cooldown, schedule time, and alert mode.
+
+### subscriptions
+Each alert rule with ticker, condition (UNDER/OVER), threshold, period, cooldown, and `created_by_user_id`.
+
+### subscription_state
+Tracks last RSI value, crossing status, cooldown, and consecutive days in zone for each subscription.
+
+## File Structure
+
+```
+rsi-discord-bot/
+├── main.py              # Main entry point with slash commands
+├── config.py            # Configuration settings
+├── database.py          # SQLite database operations
+├── rsi_calculator.py    # RSI calculation logic
+├── ticker_catalog.py    # Ticker catalog management
+├── alert_engine.py      # Alert trigger logic and formatting
+├── scheduler.py         # Scheduled job handling
+├── ticker_request.py    # Auto-add tickers from #request channel
+├── server_monitor.py    # Server health monitoring and control
+├── tickers.csv          # Instrument catalog
+├── requirements.txt     # Python dependencies
+├── rsi_bot.db          # SQLite database (created on first run)
+└── rsi_bot.log         # Log file
+```
+
+## Auto-Add Tickers (#request channel)
+
+Users can request new tickers by posting in `#request` with this format:
+
+```
+https://finance.yahoo.com/quote/CINT.ST/
+Cint Group AB
+https://www.nordnet.no/aksjer/kurser/cint-group-cint-xsto
+```
+
+The bot will:
+1. Parse the Yahoo Finance URL for the ticker symbol
+2. Use line 2 as the company name
+3. Extract the Nordnet slug from the URL
+4. Add to `tickers.csv` if not already present
+5. Reply with confirmation
+
+## Subscription Ownership
+
+- Users can only remove their **own** subscriptions with `/unsubscribe`
+- Admins can remove any subscription with `/admin-unsubscribe`
+- Admin actions are logged to `#server-changelog`
+
+## Server Monitoring
+
+Optional server health monitoring and control features.
+
+If you don’t set `SERVER_HEALTH_URL`, monitoring features will remain inactive; you only need restart/shutdown scripts if you intend to use admin server-control commands
+
+### Environment Variables
+
+```bash
+# Health check endpoint (enables monitoring)
+SERVER_HEALTH_URL=http://localhost:8080/health
+
+# Server control scripts (admin commands)
+SERVER_RESTART_SCRIPT=/opt/scripts/restart_server.sh
+SERVER_SHUTDOWN_SCRIPT=/opt/scripts/shutdown_server.sh
+```
+Windows:
+```bash
+$env:SERVER_HEALTH_URL = "http://localhost:8080/health"
+$env:SERVER_RESTART_SCRIPT = "C:\opt\scripts\restart_server.ps1"
+$env:SERVER_SHUTDOWN_SCRIPT = "C:\opt\scripts\shutdown_server.ps1"
+```
+
+### Features
+
+- Automatic status announcements when server goes online/offline
+- Scheduled restart/shutdown with warnings (10 min, 1 min before)
+- All actions logged to `#server-changelog`
+
+## Discord Bot Setup
+
+1. Go to [Discord Developer Portal](https://discord.com/developers/applications)
+2. Create a new application
+3. Go to "Bot" section and create a bot
+4. Copy the bot token
+5. Enable the following intents:
+   - **Message Content Intent** (required for #request channel)
+6. Go to OAuth2 > URL Generator
+7. Select scopes: `bot`, `applications.commands`
+8. Select permissions: `Send Messages`, `Embed Links`, `Read Message History`
+9. Use the generated URL to invite the bot to your server
+10. **Create the required channels:**
+    - `#rsi-oversold` — UNDER alerts
+    - `#rsi-overbought` — OVER alerts
+    - `#request` — Ticker add requests
+    - `#server-changelog` — Admin logs and server status
+
+## Scheduling
+
+The bot runs a daily RSI check at a configurable time (default 18:30 Europe/Oslo timezone). This is after European markets close, ensuring the day's data is complete.
+
+The job:
+1. Loads all active subscriptions
+2. Determines required tickers and RSI periods
+3. Fetches price data in batches (100 tickers per batch)
+4. Calculates RSI for each ticker/period combination
+5. Evaluates crossing conditions
+6. Sends sorted alerts to the fixed channels
+7. Updates state for next run
+
+## Troubleshooting
+
+### Commands not appearing
+- Wait 1 hour for Discord to sync globally
+- Or use `/run-now` to test immediately
+
+### No alerts triggering
+- Check `/list` to verify subscriptions exist
+- Use `/run-now` to trigger a check manually
+- Verify ticker exists in `tickers.csv`
+
+### "Channel not found" error
+- Ensure `#rsi-oversold` and `#rsi-overbought` channels exist
+- Ensure the bot has permission to send messages in these channels
+
+### RSI calculation issues
+- Ensure ticker format matches Yahoo Finance (e.g., `EQNR.OL`)
+- Check logs for data fetch errors
+
+## Logs
+
+The bot logs to both console and `rsi_bot.log`. Check logs for:
+- Startup status
+- Data fetch success/failures
+- Alert triggers
+- Errors
+
+## License
+
+MIT License - See LICENSE file for details.

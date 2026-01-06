@@ -1,0 +1,94 @@
+ticker,name,nordnet_slug
+YAR.OL,Yara International ASA,yara-international-yar-xosl
+EQNR.OL,Equinor ASA,equinor-eqnr-xosl
+SALM.OL,SalMar ASA,salmar-salm-xosl
+DNB.OL,DNB Bank ASA,dnb-dnb-xosl
+TEL.OL,Telenor ASA,telenor-tel-xosl
+MOWI.OL,Mowi ASA,mowi-mowi-xosl
+ORK.OL,Orkla ASA,orkla-ork-xosl
+AKRBP.OL,Aker BP ASA,aker-bp-akrbp-xosl
+NHY.OL,Norsk Hydro ASA,norsk-hydro-nhy-xosl
+SUBC.OL,Subsea 7 SA,subsea-7-subc-xosl
+STB.OL,Storebrand ASA,storebrand-stb-xosl
+KOG.OL,Kongsberg Gruppen ASA,kongsberg-gruppen-kog-xosl
+AKER.OL,Aker ASA,aker-aker-xosl
+GJF.OL,Gjensidige Forsikring ASA,gjensidige-forsikring-gjf-xosl
+TOM.OL,Tomra Systems ASA,tomra-systems-tom-xosl
+BAKKA.OL,Bakkafrost P/F,bakkafrost-bakka-xosl
+SCHB.OL,Schibsted ASA Class B,schibsted-schb-xosl
+AUSS.OL,Austevoll Seafood ASA,austevoll-seafood-auss-xosl
+SCHA.OL,Schibsted ASA Class A,schibsted-scha-xosl
+FRO.OL,Frontline Ltd,frontline-fro-xosl
+BWO.OL,BW Offshore Ltd,bw-offshore-bwo-xosl
+AKSO.OL,Aker Solutions ASA,aker-solutions-akso-xosl
+GOGL.OL,Golden Ocean Group Ltd,golden-ocean-group-gogl-xosl
+VAR.OL,Vår Energi ASA,var-energi-var-xosl
+HAFNI.OL,Hafnia Ltd,hafnia-hafni-xosl
+SOFF.OL,Solstad Offshore ASA,solstad-offshore-soff-xosl
+PARB.OL,Pareto Bank ASA,pareto-bank-parb-xosl
+NOD.OL,Nordic Semiconductor ASA,nordic-semiconductor-nod-xosl
+VOLUE.OL,Volue ASA,volue-volue-xosl
+ENTRA.OL,Entra ASA,entra-entra-xosl
+FLNG.OL,Flex LNG Ltd,flex-lng-flng-xosl
+KIT.OL,Kitron ASA,kitron-kit-xosl
+RECSI.OL,REC Silicon ASA,rec-silicon-recsi-xosl
+AUTO.OL,Autostore Holdings Ltd,autostore-auto-xosl
+KAHOT.OL,Kahoot! ASA,kahoot-kahot-xosl
+PGS.OL,PGS ASA,pgs-pgs-xosl
+ELMERA.OL,Elmera Group ASA,elmera-group-elmera-xosl
+MPCC.OL,MPC Container Ships ASA,mpc-container-ships-mpcc-xosl
+BORR.OL,Borr Drilling Ltd,borr-drilling-borr-xosl
+OTS.OL,Odfjell Technology Ltd,odfjell-technology-ots-xosl
+BWLPG.OL,BW LPG Ltd,bw-lpg-bwlpg-xosl
+AKH.OL,Akastor ASA,akastor-akh-xosl
+PROT.OL,Protector Forsikring ASA,protector-forsikring-prot-xosl
+ZAL.OL,Zalaris ASA,zalaris-zal-xosl
+ASTK.OL,Aker Clean Hydrogen AS,aker-clean-hydrogen-astk-xosl
+QFR.OL,Quantafuel ASA,quantafuel-qfr-xosl
+NEL.OL,Nel ASA,nel-nel-xosl
+LINK.OL,Link Mobility Group Holding ASA,link-mobility-group-holding-link-xosl
+XXL.OL,XXL ASA,xxl-xxl-xosl
+ACR.OL,Axactor ASA,axactor-acr-xosl
+NOVO-B.CO,Novo Nordisk A/S B,novo-nordisk-b-novo-b-xcse
+AREC,American Resources Corporation,american-resources-a-arec-xnas
+AEC.V,Anfield Energy Inc.,anfield-energy-aec-xtsx
+SB1NO.OL,SpareBank 1 Sør-Norge ASA,spare-bank-1-sor-norge-sb1no-xosl
+MING.OL,SpareBank 1 SMN,sparebank-1-smn-ming-xosl
+NONG.OL,SpareBank 1 Nord-Norge,sparebank-1-nord-norge-nong-xosl
+SPOL.OL,SpareBank 1 Østlandet,sparebank-1-ostlandet-spol-xosl
+SOAG.OL,SpareBank 1 Østfold Akershus,sparebank-1-ostfold-akershus-soag-xosl
+HELG.OL,SpareBank 1 Helgeland,sparebank-1-helgeland-helg-xosl
+SNOR.OL,SpareBank 1 Nordmøre,sparebank-1-nordmore-snor-xosl
+RING.OL,SpareBank 1 Ringerike Hadeland,sparebank-1-ringerike-hadeland-ring-xosl
+SBNOR.OL,Sparebanken Norge,sparebanken-norge-sbnor-xosl
+SPOG.OL,Sparebanken Øst,sparebanken-ost-spog-xosl
+MORG.OL,Sparebanken Møre,sparebanken-more-morg-xosl
+HGSB.OL,Haugesund Sparebank,haugesund-sparebank-hgsb-xosl
+AURG.OL,Aurskog Sparebank,aurskog-sparebank-aurg-xosl
+ROGS.OL,Rogaland Sparebank,rogaland-sparebank-rogs-xosl
+JAREN.OL,Jæren Sparebank,jaeren-sparebank-jaren-xosl
+BIEN.OL,Bien Sparebank ASA,bien-sparebank-asa-bien-xosl
+HSPG.OL,Høland og Setskog Sparebank,holand-og-setskog-sparebank-hspg-xosl
+SKUE.OL,Skue Sparebank,skue-sparebank-skue-xosl
+VVL.OL,Voss Veksel- og Landmandsbank,voss-veksel-og-landmandsbank-vvl-xosl
+SOGN.OL,Sogn Sparebank,sogn-sparebank-sogn-xosl
+TRSB.OL,Trøndelag Sparebank,trondelag-sparebank-trsb-xosl
+AKSO.OL,Aker Solutions ASA,aker-solutions-akso-xosl
+CINT.ST,Cint Group AB,cint-group-cint-xsto
+PRS.OL,Prosafe,prosafe-prs-xosl
+TGS.OL,TGS,tgs-xosl
+SATS.OL,SATS,sats-xosl
+NAPA.OL,Napatech,napatech-napa-xosl
+BETS-B.ST,Betsson B,betsson-b-bets-b-xsto
+HPQ,HP,hp-hpq-xnas
+KLAR,Klarna Group,klarna-group-klar-xnas
+MRSELL.ST,mResell,m-resell-mrsell-xsat
+MODTX.ST,Modus Therapeutics,modus-therapeutics-modtx-ssme
+SIN.ST,Solution International Nordics AB,solution-international-sin-xsat
+PYPL,PayPal Holdings,pay-pal-pypl-xnas
+KFR.V,Kingfisher Metals,kingfisher-metals-kfr-xtsx
+DVLT,Datavault AI,datavault-ai-dvlt-xnas
+FARON.HE,Faron Pharmaceuticals,faron-pharmaceuticals-faron-fsme
+FIG,Figma,figma-fig-xnas
+NFLX,Netflix,netflix-nflx-xnas
+BOUV.OL,Bouvet,bouvet-bouv-xosl
