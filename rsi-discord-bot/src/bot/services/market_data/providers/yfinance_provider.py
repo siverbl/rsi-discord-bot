@@ -17,12 +17,15 @@ import asyncio
 import logging
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 
 import pandas as pd
 import yfinance as yf
 
-from bot.config import BATCH_SIZE, BATCH_DELAY_SECONDS, PRICE_HISTORY_PERIOD, MIN_DATA_POINTS
+from bot.config import (
+    BATCH_SIZE, BATCH_DELAY_SECONDS, PRICE_HISTORY_PERIOD, MIN_DATA_POINTS,
+    RETRY_MAX_ATTEMPTS, RETRY_DELAY_SECONDS, RETRY_BATCH_SIZE
+)
 from bot.services.market_data.providers.base import RSIProviderBase, RSIData
 
 logger = logging.getLogger(__name__)
@@ -252,6 +255,8 @@ class YFinanceProvider(RSIProviderBase):
         Args:
             tickers: List of Yahoo Finance ticker symbols
             periods: RSI periods to calculate (default: [14])
+        
+        Failed tickers are automatically retried up to RETRY_MAX_ATTEMPTS times.
         """
         if not tickers:
             return {}
@@ -286,10 +291,88 @@ class YFinanceProvider(RSIProviderBase):
             if i + self.batch_size < len(tickers):
                 await asyncio.sleep(BATCH_DELAY_SECONDS)
         
-        # Log summary
+        # Collect failed tickers for retry
+        failed_tickers = [t for t in tickers if t in results and not results[t].success]
+        
+        # Retry failed tickers
+        if failed_tickers:
+            results = await self._retry_failed_tickers(results, failed_tickers, periods, loop)
+        
+        # Log final summary
         successful = sum(1 for r in results.values() if r.success)
         failed = len(results) - successful
         logger.info(f"yfinance fetch complete: {successful} successful, {failed} failed")
+        
+        return results
+    
+    async def _retry_failed_tickers(
+        self,
+        results: Dict[str, RSIData],
+        failed_tickers: List[str],
+        periods: List[int],
+        loop
+    ) -> Dict[str, RSIData]:
+        """
+        Retry failed tickers with smaller batches and delays.
+        
+        Args:
+            results: Current results dict to update
+            failed_tickers: List of tickers that failed
+            periods: RSI periods to calculate
+            loop: Event loop for executor
+        
+        Returns:
+            Updated results dict
+        """
+        logger.info(f"Retrying {len(failed_tickers)} failed tickers (up to {RETRY_MAX_ATTEMPTS} attempts)")
+        
+        for attempt in range(1, RETRY_MAX_ATTEMPTS + 1):
+            if not failed_tickers:
+                break
+            
+            logger.info(f"Retry attempt {attempt}/{RETRY_MAX_ATTEMPTS} for {len(failed_tickers)} tickers")
+            
+            # Wait before retry
+            await asyncio.sleep(RETRY_DELAY_SECONDS)
+            
+            still_failed = []
+            
+            # Process in smaller batches for retries
+            for i in range(0, len(failed_tickers), RETRY_BATCH_SIZE):
+                batch = failed_tickers[i:i + RETRY_BATCH_SIZE]
+                
+                logger.info(f"Retry batch: {len(batch)} tickers")
+                
+                # Run sync function in executor
+                batch_results = await loop.run_in_executor(
+                    self._executor,
+                    self._fetch_batch_sync,
+                    batch,
+                    periods
+                )
+                
+                # Check results and update
+                for ticker in batch:
+                    if ticker in batch_results:
+                        result = batch_results[ticker]
+                        if result.success:
+                            results[ticker] = result
+                            logger.info(f"Retry successful for {ticker}")
+                        else:
+                            still_failed.append(ticker)
+                
+                # Small delay between retry batches
+                if i + RETRY_BATCH_SIZE < len(failed_tickers):
+                    await asyncio.sleep(RETRY_DELAY_SECONDS / 2)
+            
+            failed_tickers = still_failed
+            
+            if not failed_tickers:
+                logger.info(f"All retries successful after attempt {attempt}")
+                break
+        
+        if failed_tickers:
+            logger.warning(f"Still failed after {RETRY_MAX_ATTEMPTS} retries: {failed_tickers}")
         
         return results
     

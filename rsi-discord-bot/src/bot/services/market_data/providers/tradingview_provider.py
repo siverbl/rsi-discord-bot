@@ -4,66 +4,24 @@ TradingView Screener RSI Provider.
 Uses the tradingview_screener package to fetch RSI data from TradingView's screener API.
 This is the default provider as it provides pre-calculated RSI values efficiently.
 
+Ticker mapping uses tradingview_slug from tickers.csv (already in EXCHANGE:SYMBOL format).
+
 Documentation: https://shner-elmo.github.io/TradingView-Screener/
 """
 import asyncio
 import logging
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 
-from bot.config import TV_BATCH_SIZE, TV_BATCH_DELAY_SECONDS
+from bot.config import (
+    TV_BATCH_SIZE, TV_BATCH_DELAY_SECONDS,
+    RETRY_MAX_ATTEMPTS, RETRY_DELAY_SECONDS, RETRY_BATCH_SIZE
+)
 from bot.services.market_data.providers.base import RSIProviderBase, RSIData
+from bot.repositories.ticker_catalog import get_catalog
 
 logger = logging.getLogger(__name__)
-
-
-def yahoo_to_tradingview(yahoo_ticker: str) -> Optional[str]:
-    """
-    Convert Yahoo Finance ticker format to TradingView format.
-    
-    Yahoo Format: EQNR.OL, AAPL, TSLA
-    TradingView Format: OSL:EQNR, NASDAQ:AAPL, NASDAQ:TSLA
-    
-    This is a best-effort conversion. Some tickers may not map correctly.
-    """
-    yahoo_ticker = yahoo_ticker.upper().strip()
-    
-    # Common Yahoo suffix to TradingView exchange mapping
-    suffix_map = {
-        '.OL': 'OSL',       # Oslo Stock Exchange
-        '.ST': 'STO',       # Stockholm (OMX Stockholm)
-        '.CO': 'CSE',       # Copenhagen
-        '.HE': 'HEL',       # Helsinki
-        '.AS': 'EURONEXT',  # Amsterdam
-        '.PA': 'EURONEXT',  # Paris
-        '.DE': 'XETR',      # Frankfurt (Xetra)
-        '.F': 'FWB',        # Frankfurt
-        '.L': 'LSE',        # London
-        '.MI': 'MIL',       # Milan
-        '.MC': 'BME',       # Madrid
-        '.SW': 'SIX',       # Zurich
-        '.VI': 'VIE',       # Vienna
-        '.BR': 'EURONEXT',  # Brussels
-        '.LS': 'EURONEXT',  # Lisbon
-        '.TO': 'TSX',       # Toronto
-        '.V': 'TSXV',       # TSX Venture
-        '.HK': 'HKEX',      # Hong Kong
-        '.T': 'TSE',        # Tokyo
-        '.SS': 'SSE',       # Shanghai
-        '.SZ': 'SZSE',      # Shenzhen
-    }
-    
-    # Check if ticker has a suffix
-    for suffix, exchange in suffix_map.items():
-        if yahoo_ticker.endswith(suffix):
-            base_symbol = yahoo_ticker[:-len(suffix)]
-            return f"{exchange}:{base_symbol}"
-    
-    # No suffix - assume US stock
-    # Try to determine exchange (simplified logic)
-    # In reality, you'd need a lookup table for accurate mapping
-    return f"NASDAQ:{yahoo_ticker}"  # Default to NASDAQ
 
 
 class TradingViewProvider(RSIProviderBase):
@@ -73,16 +31,32 @@ class TradingViewProvider(RSIProviderBase):
     Features:
     - Batch queries for efficiency (up to 50 tickers per request)
     - Pre-calculated RSI values from TradingView
-    - Includes timestamp information
+    - Uses tradingview_slug from tickers.csv for accurate ticker mapping
     """
     
     def __init__(self, batch_size: int = TV_BATCH_SIZE):
         self.batch_size = batch_size
         self._executor = ThreadPoolExecutor(max_workers=4)
+        self._catalog = get_catalog()
     
     @property
     def name(self) -> str:
         return "TradingView Screener"
+    
+    def _get_tradingview_ticker(self, yahoo_ticker: str) -> Optional[str]:
+        """
+        Get TradingView ticker from catalog's tradingview_slug.
+        
+        Args:
+            yahoo_ticker: Yahoo Finance ticker (e.g., "EQNR.OL", "AAPL")
+        
+        Returns:
+            TradingView ticker (e.g., "OSL:EQNR") or None if not found
+        """
+        instrument = self._catalog.get_instrument(yahoo_ticker)
+        if instrument and instrument.tradingview_slug:
+            return instrument.tradingview_slug
+        return None
     
     def _fetch_batch_sync(
         self,
@@ -151,7 +125,9 @@ class TradingViewProvider(RSIProviderBase):
                     if close_value is not None:
                         close_value = float(close_value)
                     
-                    name = row.get('name', yf_ticker)
+                    # Get name from catalog (more reliable than TradingView)
+                    instrument = self._catalog.get_instrument(yf_ticker)
+                    name = instrument.name if instrument else row.get('name', yf_ticker)
                     
                     results[yf_ticker] = RSIData(
                         ticker=yf_ticker,
@@ -214,20 +190,22 @@ class TradingViewProvider(RSIProviderBase):
         
         Note: TradingView Screener only provides RSI14 (14-period RSI).
         Other periods are not available through this API.
+        
+        Failed tickers are automatically retried up to RETRY_MAX_ATTEMPTS times.
         """
         if not tickers:
             return {}
         
         results: Dict[str, RSIData] = {}
         
-        # Convert Yahoo tickers to TradingView format
+        # Convert Yahoo tickers to TradingView format using catalog
         ticker_mapping = []  # List of (tv_ticker, yahoo_ticker) pairs
         for yf_ticker in tickers:
-            tv_ticker = yahoo_to_tradingview(yf_ticker)
+            tv_ticker = self._get_tradingview_ticker(yf_ticker)
             if tv_ticker:
                 ticker_mapping.append((tv_ticker, yf_ticker))
             else:
-                # Can't convert - mark as failed immediately
+                # No tradingview_slug in catalog - mark as failed
                 results[yf_ticker] = RSIData(
                     ticker=yf_ticker,
                     name=None,
@@ -235,7 +213,7 @@ class TradingViewProvider(RSIProviderBase):
                     close=None,
                     data_timestamp=datetime.utcnow(),
                     success=False,
-                    error="Could not convert to TradingView format"
+                    error="No tradingview_slug in catalog"
                 )
         
         if not ticker_mapping:
@@ -270,10 +248,93 @@ class TradingViewProvider(RSIProviderBase):
             if i + self.batch_size < len(ticker_mapping):
                 await asyncio.sleep(TV_BATCH_DELAY_SECONDS)
         
-        # Log summary
+        # Collect failed tickers for retry
+        failed_tickers = [
+            (tv, yf) for tv, yf in ticker_mapping 
+            if yf in results and not results[yf].success
+        ]
+        
+        # Retry failed tickers
+        if failed_tickers:
+            results = await self._retry_failed_tickers(results, failed_tickers, loop)
+        
+        # Log final summary
         successful = sum(1 for r in results.values() if r.success)
         failed = len(results) - successful
         logger.info(f"TradingView fetch complete: {successful} successful, {failed} failed")
+        
+        return results
+    
+    async def _retry_failed_tickers(
+        self,
+        results: Dict[str, RSIData],
+        failed_tickers: List[Tuple[str, str]],
+        loop
+    ) -> Dict[str, RSIData]:
+        """
+        Retry failed tickers with smaller batches and delays.
+        
+        Args:
+            results: Current results dict to update
+            failed_tickers: List of (tv_ticker, yahoo_ticker) pairs that failed
+            loop: Event loop for executor
+        
+        Returns:
+            Updated results dict
+        """
+        logger.info(f"Retrying {len(failed_tickers)} failed tickers (up to {RETRY_MAX_ATTEMPTS} attempts)")
+        
+        for attempt in range(1, RETRY_MAX_ATTEMPTS + 1):
+            if not failed_tickers:
+                break
+            
+            logger.info(f"Retry attempt {attempt}/{RETRY_MAX_ATTEMPTS} for {len(failed_tickers)} tickers")
+            
+            # Wait before retry
+            await asyncio.sleep(RETRY_DELAY_SECONDS)
+            
+            still_failed = []
+            
+            # Process in smaller batches for retries
+            for i in range(0, len(failed_tickers), RETRY_BATCH_SIZE):
+                batch = failed_tickers[i:i + RETRY_BATCH_SIZE]
+                
+                tv_tickers = [t[0] for t in batch]
+                yf_tickers = [t[1] for t in batch]
+                
+                logger.info(f"Retry batch: {len(batch)} tickers")
+                
+                # Run sync function in executor
+                batch_results = await loop.run_in_executor(
+                    self._executor,
+                    self._fetch_batch_sync,
+                    tv_tickers,
+                    yf_tickers
+                )
+                
+                # Check results and update
+                for tv_ticker, yf_ticker in batch:
+                    if yf_ticker in batch_results:
+                        result = batch_results[yf_ticker]
+                        if result.success:
+                            results[yf_ticker] = result
+                            logger.info(f"Retry successful for {yf_ticker}")
+                        else:
+                            still_failed.append((tv_ticker, yf_ticker))
+                
+                # Small delay between retry batches
+                if i + RETRY_BATCH_SIZE < len(failed_tickers):
+                    await asyncio.sleep(RETRY_DELAY_SECONDS / 2)
+            
+            failed_tickers = still_failed
+            
+            if not failed_tickers:
+                logger.info(f"All retries successful after attempt {attempt}")
+                break
+        
+        if failed_tickers:
+            failed_symbols = [yf for _, yf in failed_tickers]
+            logger.warning(f"Still failed after {RETRY_MAX_ATTEMPTS} retries: {failed_symbols}")
         
         return results
     

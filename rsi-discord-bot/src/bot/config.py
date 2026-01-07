@@ -44,6 +44,11 @@ RSI_PROVIDER = os.getenv("RSI_PROVIDER", "tradingview").lower().strip()
 TV_BATCH_SIZE = 50  # Tickers per request (safe limit for TradingView)
 TV_BATCH_DELAY_SECONDS = 3.0  # Delay between batches to avoid rate limiting
 
+# Retry settings for failed tickers
+RETRY_MAX_ATTEMPTS = 3  # Number of retry attempts for failed tickers
+RETRY_DELAY_SECONDS = 5.0  # Delay before each retry attempt
+RETRY_BATCH_SIZE = 10  # Smaller batch size for retries (more reliable)
+
 # =============================================================================
 # RSI calculation defaults
 # =============================================================================
