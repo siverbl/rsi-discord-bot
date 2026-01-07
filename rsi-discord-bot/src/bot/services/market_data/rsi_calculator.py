@@ -1,36 +1,72 @@
 """
 RSI Calculator module for the RSI Discord Bot.
-Adapted from yFinanceRSIcalc.py with support for multiple periods.
+
+This module provides a unified interface for RSI calculation using
+configurable data providers (TradingView Screener or yfinance).
+
+The calculator maintains backwards compatibility with the existing
+codebase while using the new provider system under the hood.
 """
 import asyncio
-import time
 import logging
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional
 from dataclasses import dataclass
-from concurrent.futures import ThreadPoolExecutor
+from datetime import datetime
 
 import pandas as pd
-import yfinance as yf
 
-from bot.config import BATCH_SIZE, BATCH_DELAY_SECONDS, PRICE_HISTORY_PERIOD, MIN_DATA_POINTS
+from bot.config import BATCH_SIZE, RSI_PROVIDER
+from bot.services.market_data.providers import get_provider, RSIData
 
 logger = logging.getLogger(__name__)
 
 
 @dataclass
 class RSIResult:
-    """Result of RSI calculation for a single ticker."""
+    """
+    Result of RSI calculation for a single ticker.
+    
+    This class maintains backwards compatibility with the existing codebase
+    while wrapping the new RSIData from providers.
+    """
     ticker: str
     rsi_values: Dict[int, float]  # period -> RSI value
     last_date: str
     last_close: float
     success: bool
     error: Optional[str] = None
+    data_timestamp: Optional[datetime] = None  # NEW: When data was fetched
+    name: Optional[str] = None  # NEW: Company name if available
+    
+    @classmethod
+    def from_rsi_data(cls, data: RSIData) -> 'RSIResult':
+        """Create RSIResult from provider RSIData."""
+        rsi_values = data.rsi_values or {}
+        if data.rsi_14 is not None and 14 not in rsi_values:
+            rsi_values[14] = data.rsi_14
+        
+        last_date = ""
+        if data.data_timestamp:
+            last_date = data.data_timestamp.strftime("%Y-%m-%d")
+        
+        return cls(
+            ticker=data.ticker,
+            rsi_values=rsi_values,
+            last_date=last_date,
+            last_close=data.close or 0.0,
+            success=data.success,
+            error=data.error,
+            data_timestamp=data.data_timestamp,
+            name=data.name
+        )
 
 
 def calculate_rsi(price_series: pd.Series, window: int = 14) -> Optional[float]:
     """
     Calculate Wilder's RSI for the given price series.
+    
+    This function is kept for backwards compatibility and for cases
+    where RSI needs to be calculated from raw price data.
     
     Args:
         price_series: Pandas Series of prices (adjusted close preferred)
@@ -90,130 +126,31 @@ def calculate_rsi_series(price_series: pd.Series, window: int = 14) -> pd.Series
 
 class RSICalculator:
     """
-    Handles RSI calculation for multiple tickers with batched data fetching.
+    Handles RSI calculation for multiple tickers using configurable providers.
+    
+    This class uses the provider system to fetch RSI data, making it easy
+    to switch between TradingView Screener and yfinance.
     """
     
-    def __init__(self, batch_size: int = BATCH_SIZE):
+    def __init__(self, batch_size: int = BATCH_SIZE, provider_name: Optional[str] = None):
+        """
+        Initialize the RSI Calculator.
+        
+        Args:
+            batch_size: Number of tickers to process per batch
+            provider_name: Optional override for RSI provider ("tradingview" or "yfinance")
+        """
         self.batch_size = batch_size
-        self._executor = ThreadPoolExecutor(max_workers=4)
-
-    def _fetch_batch_sync(self, ticker_list: List[str]) -> Tuple[pd.DataFrame, Optional[str]]:
-        """
-        Synchronously fetch data for a batch of tickers.
-        Returns (DataFrame, error_message).
-        """
-        try:
-            data = yf.download(
-                tickers=ticker_list,
-                period=PRICE_HISTORY_PERIOD,
-                interval="1d",
-                auto_adjust=False,
-                group_by="ticker",
-                progress=False
-            )
-            return data, None
-        except Exception as e:
-            return pd.DataFrame(), str(e)
-
-    async def fetch_batch(self, ticker_list: List[str]) -> Tuple[pd.DataFrame, Optional[str]]:
-        """
-        Asynchronously fetch data for a batch of tickers.
-        """
-        loop = asyncio.get_event_loop()
-        return await loop.run_in_executor(
-            self._executor,
-            self._fetch_batch_sync,
-            ticker_list
-        )
-
-    def _process_ticker_data(
-        self,
-        ticker: str,
-        data: pd.DataFrame,
-        required_periods: List[int]
-    ) -> RSIResult:
-        """
-        Process data for a single ticker and calculate RSI for all required periods.
-        """
-        try:
-            # Handle MultiIndex columns (multi-ticker batch)
-            if isinstance(data.columns, pd.MultiIndex):
-                if ticker not in data.columns.get_level_values(0):
-                    return RSIResult(
-                        ticker=ticker,
-                        rsi_values={},
-                        last_date="",
-                        last_close=0.0,
-                        success=False,
-                        error="No data returned"
-                    )
-                hist_df = data[ticker]
-            else:
-                hist_df = data
-
-            if hist_df.empty:
-                return RSIResult(
-                    ticker=ticker,
-                    rsi_values={},
-                    last_date="",
-                    last_close=0.0,
-                    success=False,
-                    error="Empty data"
-                )
-
-            # Use adjusted close if available, otherwise use close
-            price_col = "Adj Close" if "Adj Close" in hist_df.columns else "Close"
-            prices = hist_df[price_col].dropna()
-
-            if len(prices) < MIN_DATA_POINTS:
-                return RSIResult(
-                    ticker=ticker,
-                    rsi_values={},
-                    last_date="",
-                    last_close=0.0,
-                    success=False,
-                    error=f"Not enough data ({len(prices)} points)"
-                )
-
-            # Calculate RSI for each required period
-            rsi_values = {}
-            for period in required_periods:
-                rsi = calculate_rsi(prices, window=period)
-                if rsi is not None:
-                    rsi_values[period] = rsi
-
-            if not rsi_values:
-                return RSIResult(
-                    ticker=ticker,
-                    rsi_values={},
-                    last_date="",
-                    last_close=0.0,
-                    success=False,
-                    error="RSI calculation failed"
-                )
-
-            last_date = prices.index[-1].strftime("%Y-%m-%d")
-            last_close = float(prices.iloc[-1])
-
-            return RSIResult(
-                ticker=ticker,
-                rsi_values=rsi_values,
-                last_date=last_date,
-                last_close=last_close,
-                success=True
-            )
-
-        except Exception as e:
-            logger.error(f"Error processing {ticker}: {e}")
-            return RSIResult(
-                ticker=ticker,
-                rsi_values={},
-                last_date="",
-                last_close=0.0,
-                success=False,
-                error=str(e)
-            )
-
+        self._provider_name = provider_name
+        self._provider = None
+    
+    @property
+    def provider(self):
+        """Get the RSI provider (lazy initialization)."""
+        if self._provider is None:
+            self._provider = get_provider(self._provider_name)
+        return self._provider
+    
     async def calculate_rsi_for_tickers(
         self,
         ticker_periods: Dict[str, List[int]]
@@ -233,105 +170,39 @@ class RSICalculator:
         if not tickers:
             return results
 
-        logger.info(f"Fetching RSI data for {len(tickers)} tickers")
+        logger.info(f"Fetching RSI data for {len(tickers)} tickers using {self.provider.name}")
 
-        # Process in batches
-        for i in range(0, len(tickers), self.batch_size):
-            batch = tickers[i:i + self.batch_size]
-            batch_num = i // self.batch_size + 1
-            total_batches = (len(tickers) + self.batch_size - 1) // self.batch_size
-
-            logger.info(f"Processing batch {batch_num}/{total_batches} ({len(batch)} tickers)")
-
-            # Fetch data for batch
-            data, error = await self.fetch_batch(batch)
-
-            if error:
-                logger.warning(f"Batch fetch error: {error}")
-                # Try splitting the batch if it's larger than 1
-                if len(batch) > 1:
-                    mid = len(batch) // 2
-                    sub_results = await self._process_failed_batch(
-                        batch, ticker_periods
-                    )
-                    results.update(sub_results)
-                else:
-                    # Single ticker failed
-                    ticker = batch[0]
-                    results[ticker] = RSIResult(
-                        ticker=ticker,
-                        rsi_values={},
-                        last_date="",
-                        last_close=0.0,
-                        success=False,
-                        error=error
-                    )
-            else:
-                # Process each ticker in the batch
-                for ticker in batch:
-                    result = self._process_ticker_data(
-                        ticker, data, ticker_periods[ticker]
-                    )
-                    results[ticker] = result
-
-            # Delay between batches to avoid rate limits
-            if i + self.batch_size < len(tickers):
-                await asyncio.sleep(BATCH_DELAY_SECONDS)
-
-        # Log summary
-        successful = sum(1 for r in results.values() if r.success)
-        failed = len(results) - successful
-        logger.info(f"RSI calculation complete: {successful} successful, {failed} failed")
-
-        return results
-
-    async def _process_failed_batch(
-        self,
-        batch: List[str],
-        ticker_periods: Dict[str, List[int]]
-    ) -> Dict[str, RSIResult]:
-        """
-        Handle a failed batch by recursively splitting it.
-        """
-        results = {}
-
-        if len(batch) == 1:
-            ticker = batch[0]
-            # Try one more time for single ticker
-            data, error = await self.fetch_batch([ticker])
-            if error or data.empty:
+        # Collect all unique periods
+        all_periods = set()
+        for periods in ticker_periods.values():
+            all_periods.update(periods)
+        
+        # Fetch data using provider
+        provider_results = await self.provider.get_rsi_for_tickers(
+            tickers=tickers,
+            periods=list(all_periods)
+        )
+        
+        # Convert to RSIResult format
+        for ticker, rsi_data in provider_results.items():
+            results[ticker] = RSIResult.from_rsi_data(rsi_data)
+        
+        # Ensure all requested tickers have a result
+        for ticker in tickers:
+            if ticker not in results:
                 results[ticker] = RSIResult(
                     ticker=ticker,
                     rsi_values={},
                     last_date="",
                     last_close=0.0,
                     success=False,
-                    error=error or "No data"
+                    error="No result from provider"
                 )
-            else:
-                results[ticker] = self._process_ticker_data(
-                    ticker, data, ticker_periods[ticker]
-                )
-            return results
-
-        # Split batch in half and process each
-        mid = len(batch) // 2
-        batch1 = batch[:mid]
-        batch2 = batch[mid:]
-
-        for sub_batch in [batch1, batch2]:
-            await asyncio.sleep(BATCH_DELAY_SECONDS)
-            data, error = await self.fetch_batch(sub_batch)
-
-            if error:
-                sub_results = await self._process_failed_batch(sub_batch, ticker_periods)
-                results.update(sub_results)
-            else:
-                for ticker in sub_batch:
-                    result = self._process_ticker_data(
-                        ticker, data, ticker_periods[ticker]
-                    )
-                    results[ticker] = result
+        
+        # Log summary
+        successful = sum(1 for r in results.values() if r.success)
+        failed = len(results) - successful
+        logger.info(f"RSI calculation complete: {successful} successful, {failed} failed")
 
         return results
 
@@ -344,6 +215,8 @@ class RSICalculator:
     ) -> int:
         """
         Count consecutive trading days where RSI is above/below threshold.
+        
+        Note: This requires full price history and calculates RSI locally.
         
         Args:
             price_series: Historical price data

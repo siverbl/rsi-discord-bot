@@ -1,15 +1,19 @@
 """
 Database module for RSI Discord Bot.
-Uses SQLite for persistent storage of subscriptions and state.
+Uses SQLite for persistent storage of subscriptions, state, and auto-scan settings.
 """
 import aiosqlite
-from datetime import datetime
-from typing import Optional, List, Dict, Any
-from dataclasses import dataclass
+from datetime import datetime, date
+from typing import Optional, List, Dict, Any, Set
+from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
 
-from bot.config import DEFAULT_RSI_PERIOD, DEFAULT_COOLDOWN_HOURS, DEFAULT_SCHEDULE_TIME, DEFAULT_ALERT_MODE, DEFAULT_HYSTERESIS, DB_PATH
+from bot.config import (
+    DEFAULT_RSI_PERIOD, DEFAULT_COOLDOWN_HOURS, DEFAULT_SCHEDULE_TIME, 
+    DEFAULT_ALERT_MODE, DEFAULT_HYSTERESIS, DB_PATH,
+    DEFAULT_AUTO_OVERSOLD_THRESHOLD, DEFAULT_AUTO_OVERBOUGHT_THRESHOLD
+)
 
 
 class Condition(Enum):
@@ -37,6 +41,9 @@ class GuildConfig:
     default_cooldown_hours: int
     alert_mode: str
     hysteresis: float
+    # NEW: Auto-scan threshold settings (admin-configurable)
+    auto_oversold_threshold: float = DEFAULT_AUTO_OVERSOLD_THRESHOLD
+    auto_overbought_threshold: float = DEFAULT_AUTO_OVERBOUGHT_THRESHOLD
 
 
 @dataclass
@@ -66,6 +73,17 @@ class SubscriptionState:
     days_in_zone: int  # consecutive days under/over threshold
 
 
+@dataclass
+class AutoScanState:
+    """Tracks the daily state of automatic RSI scans."""
+    guild_id: int
+    scan_date: str  # YYYY-MM-DD format
+    condition: str  # "UNDER" or "OVER"
+    last_tickers: Set[str] = field(default_factory=set)  # Tickers that met condition
+    last_scan_time: Optional[datetime] = None
+    post_count: int = 0  # Number of times posted today
+
+
 class Database:
     def __init__(self, db_path=DB_PATH):
         self.db_path = str(db_path)
@@ -74,7 +92,7 @@ class Database:
     async def initialize(self):
         """Create database tables if they don't exist."""
         async with aiosqlite.connect(self.db_path) as db:
-            # Guild configuration table
+            # Guild configuration table (with new auto-scan fields)
             await db.execute("""
                 CREATE TABLE IF NOT EXISTS guild_config (
                     guild_id INTEGER PRIMARY KEY,
@@ -83,7 +101,9 @@ class Database:
                     default_schedule_time TEXT DEFAULT '18:30',
                     default_cooldown_hours INTEGER DEFAULT 24,
                     alert_mode TEXT DEFAULT 'CROSSING',
-                    hysteresis REAL DEFAULT 2.0
+                    hysteresis REAL DEFAULT 2.0,
+                    auto_oversold_threshold REAL DEFAULT 34,
+                    auto_overbought_threshold REAL DEFAULT 70
                 )
             """)
 
@@ -118,6 +138,20 @@ class Database:
                     FOREIGN KEY (subscription_id) REFERENCES subscriptions(id) ON DELETE CASCADE
                 )
             """)
+            
+            # NEW: Auto-scan daily state table (for change detection)
+            await db.execute("""
+                CREATE TABLE IF NOT EXISTS auto_scan_state (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    guild_id INTEGER NOT NULL,
+                    scan_date TEXT NOT NULL,
+                    condition TEXT NOT NULL CHECK (condition IN ('UNDER', 'OVER')),
+                    tickers_json TEXT NOT NULL DEFAULT '[]',
+                    last_scan_time TEXT,
+                    post_count INTEGER DEFAULT 0,
+                    UNIQUE(guild_id, scan_date, condition)
+                )
+            """)
 
             # Create indexes for faster queries
             await db.execute("""
@@ -132,6 +166,21 @@ class Database:
                 CREATE INDEX IF NOT EXISTS idx_subscriptions_enabled 
                 ON subscriptions(enabled)
             """)
+            await db.execute("""
+                CREATE INDEX IF NOT EXISTS idx_auto_scan_state_guild_date 
+                ON auto_scan_state(guild_id, scan_date)
+            """)
+            
+            # Add new columns if they don't exist (migration for existing databases)
+            try:
+                await db.execute("ALTER TABLE guild_config ADD COLUMN auto_oversold_threshold REAL DEFAULT 34")
+            except:
+                pass  # Column already exists
+            
+            try:
+                await db.execute("ALTER TABLE guild_config ADD COLUMN auto_overbought_threshold REAL DEFAULT 70")
+            except:
+                pass  # Column already exists
 
             await db.commit()
 
@@ -142,21 +191,28 @@ class Database:
         async with aiosqlite.connect(self.db_path) as db:
             db.row_factory = aiosqlite.Row
             async with db.execute(
-                "SELECT * FROM guild_config WHERE guild_id = ?",
-                (guild_id,)
+                    "SELECT * FROM guild_config WHERE guild_id = ?",
+                    (guild_id,)
             ) as cursor:
                 row = await cursor.fetchone()
-                if row:
-                    return GuildConfig(
-                        guild_id=row['guild_id'],
-                        default_channel_id=row['default_channel_id'],
-                        default_rsi_period=row['default_rsi_period'],
-                        default_schedule_time=row['default_schedule_time'],
-                        default_cooldown_hours=row['default_cooldown_hours'],
-                        alert_mode=row['alert_mode'],
-                        hysteresis=row['hysteresis']
-                    )
-                return None
+                if not row:
+                    return None
+
+                # aiosqlite.Row støtter "in" via keys()
+                oversold = row['auto_oversold_threshold'] if 'auto_oversold_threshold' in row.keys() else None
+                overbought = row['auto_overbought_threshold'] if 'auto_overbought_threshold' in row.keys() else None
+
+                return GuildConfig(
+                    guild_id=row['guild_id'],
+                    default_channel_id=row['default_channel_id'],
+                    default_rsi_period=row['default_rsi_period'],
+                    default_schedule_time=row['default_schedule_time'],
+                    default_cooldown_hours=row['default_cooldown_hours'],
+                    alert_mode=row['alert_mode'],
+                    hysteresis=row['hysteresis'],
+                    auto_oversold_threshold=DEFAULT_AUTO_OVERSOLD_THRESHOLD if oversold is None else oversold,
+                    auto_overbought_threshold=DEFAULT_AUTO_OVERBOUGHT_THRESHOLD if overbought is None else overbought,
+                )
 
     async def get_or_create_guild_config(self, guild_id: int) -> GuildConfig:
         """Get guild config, creating default if it doesn't exist."""
@@ -167,10 +223,12 @@ class Database:
         async with aiosqlite.connect(self.db_path) as db:
             await db.execute(
                 """INSERT INTO guild_config (guild_id, default_rsi_period, 
-                   default_schedule_time, default_cooldown_hours, alert_mode, hysteresis)
-                   VALUES (?, ?, ?, ?, ?, ?)""",
+                   default_schedule_time, default_cooldown_hours, alert_mode, hysteresis,
+                   auto_oversold_threshold, auto_overbought_threshold)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
                 (guild_id, DEFAULT_RSI_PERIOD, DEFAULT_SCHEDULE_TIME,
-                 DEFAULT_COOLDOWN_HOURS, DEFAULT_ALERT_MODE, DEFAULT_HYSTERESIS)
+                 DEFAULT_COOLDOWN_HOURS, DEFAULT_ALERT_MODE, DEFAULT_HYSTERESIS,
+                 DEFAULT_AUTO_OVERSOLD_THRESHOLD, DEFAULT_AUTO_OVERBOUGHT_THRESHOLD)
             )
             await db.commit()
 
@@ -181,7 +239,9 @@ class Database:
             default_schedule_time=DEFAULT_SCHEDULE_TIME,
             default_cooldown_hours=DEFAULT_COOLDOWN_HOURS,
             alert_mode=DEFAULT_ALERT_MODE,
-            hysteresis=DEFAULT_HYSTERESIS
+            hysteresis=DEFAULT_HYSTERESIS,
+            auto_oversold_threshold=DEFAULT_AUTO_OVERSOLD_THRESHOLD,
+            auto_overbought_threshold=DEFAULT_AUTO_OVERBOUGHT_THRESHOLD
         )
 
     async def update_guild_config(
@@ -192,7 +252,9 @@ class Database:
         default_schedule_time: Optional[str] = None,
         default_cooldown_hours: Optional[int] = None,
         alert_mode: Optional[str] = None,
-        hysteresis: Optional[float] = None
+        hysteresis: Optional[float] = None,
+        auto_oversold_threshold: Optional[float] = None,
+        auto_overbought_threshold: Optional[float] = None
     ) -> GuildConfig:
         """Update guild configuration with provided values."""
         # Ensure config exists
@@ -219,6 +281,12 @@ class Database:
         if hysteresis is not None:
             updates.append("hysteresis = ?")
             params.append(hysteresis)
+        if auto_oversold_threshold is not None:
+            updates.append("auto_oversold_threshold = ?")
+            params.append(auto_oversold_threshold)
+        if auto_overbought_threshold is not None:
+            updates.append("auto_overbought_threshold = ?")
+            params.append(auto_overbought_threshold)
 
         if updates:
             params.append(guild_id)
@@ -364,11 +432,7 @@ class Database:
                 return await cursor.fetchone() is not None
 
     async def delete_user_subscriptions(self, guild_id: int, user_id: int) -> int:
-        """Delete all subscriptions created by a specific user in a guild.
-        
-        Returns:
-            Number of subscriptions deleted
-        """
+        """Delete all subscriptions created by a specific user in a guild."""
         async with aiosqlite.connect(self.db_path) as db:
             # First get the IDs to delete state records
             async with db.execute(
@@ -496,6 +560,102 @@ class Database:
                 rows = await cursor.fetchall()
                 return [dict(row) for row in rows]
 
+    # ==================== Auto-Scan State Operations ====================
+    
+    async def get_auto_scan_state(
+        self,
+        guild_id: int,
+        scan_date: str,
+        condition: str
+    ) -> Optional[AutoScanState]:
+        """Get the auto-scan state for a guild/date/condition."""
+        import json
+        async with aiosqlite.connect(self.db_path) as db:
+            db.row_factory = aiosqlite.Row
+            async with db.execute(
+                """SELECT * FROM auto_scan_state 
+                   WHERE guild_id = ? AND scan_date = ? AND condition = ?""",
+                (guild_id, scan_date, condition)
+            ) as cursor:
+                row = await cursor.fetchone()
+                if row:
+                    tickers_json = row['tickers_json'] or '[]'
+                    tickers = set(json.loads(tickers_json))
+                    last_scan_time = None
+                    if row['last_scan_time']:
+                        try:
+                            last_scan_time = datetime.fromisoformat(row['last_scan_time'])
+                        except:
+                            pass
+                    return AutoScanState(
+                        guild_id=row['guild_id'],
+                        scan_date=row['scan_date'],
+                        condition=row['condition'],
+                        last_tickers=tickers,
+                        last_scan_time=last_scan_time,
+                        post_count=row['post_count'] or 0
+                    )
+                return None
+    
+    async def update_auto_scan_state(
+        self,
+        guild_id: int,
+        scan_date: str,
+        condition: str,
+        tickers: Set[str],
+        increment_post_count: bool = False
+    ) -> AutoScanState:
+        """Update or create auto-scan state."""
+        import json
+        tickers_json = json.dumps(sorted(list(tickers)))
+        now = datetime.utcnow().isoformat()
+        
+        async with aiosqlite.connect(self.db_path) as db:
+            # Try to get existing state
+            existing = await self.get_auto_scan_state(guild_id, scan_date, condition)
+            
+            if existing:
+                # Update existing
+                if increment_post_count:
+                    await db.execute(
+                        """UPDATE auto_scan_state 
+                           SET tickers_json = ?, last_scan_time = ?, post_count = post_count + 1
+                           WHERE guild_id = ? AND scan_date = ? AND condition = ?""",
+                        (tickers_json, now, guild_id, scan_date, condition)
+                    )
+                else:
+                    await db.execute(
+                        """UPDATE auto_scan_state 
+                           SET tickers_json = ?, last_scan_time = ?
+                           WHERE guild_id = ? AND scan_date = ? AND condition = ?""",
+                        (tickers_json, now, guild_id, scan_date, condition)
+                    )
+            else:
+                # Insert new
+                post_count = 1 if increment_post_count else 0
+                await db.execute(
+                    """INSERT INTO auto_scan_state 
+                       (guild_id, scan_date, condition, tickers_json, last_scan_time, post_count)
+                       VALUES (?, ?, ?, ?, ?, ?)""",
+                    (guild_id, scan_date, condition, tickers_json, now, post_count)
+                )
+            
+            await db.commit()
+        
+        return await self.get_auto_scan_state(guild_id, scan_date, condition)
+    
+    async def cleanup_old_auto_scan_states(self, days_to_keep: int = 7):
+        """Clean up old auto-scan state records."""
+        from datetime import timedelta
+        cutoff_date = (datetime.utcnow() - timedelta(days=days_to_keep)).strftime("%Y-%m-%d")
+        
+        async with aiosqlite.connect(self.db_path) as db:
+            await db.execute(
+                "DELETE FROM auto_scan_state WHERE scan_date < ?",
+                (cutoff_date,)
+            )
+            await db.commit()
+
     # ==================== Helper Methods ====================
 
     def _row_to_subscription(self, row) -> Subscription:
@@ -531,6 +691,15 @@ class Database:
                 """SELECT DISTINCT period FROM subscriptions 
                    WHERE ticker = ? AND enabled = 1""",
                 (ticker.upper(),)
+            ) as cursor:
+                rows = await cursor.fetchall()
+                return [row[0] for row in rows]
+    
+    async def get_all_guild_ids(self) -> List[int]:
+        """Get all guild IDs that have configurations."""
+        async with aiosqlite.connect(self.db_path) as db:
+            async with db.execute(
+                "SELECT DISTINCT guild_id FROM guild_config"
             ) as cursor:
                 rows = await cursor.fetchall()
                 return [row[0] for row in rows]

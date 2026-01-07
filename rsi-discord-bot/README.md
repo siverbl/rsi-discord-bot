@@ -1,11 +1,14 @@
 # RSI Discord Bot
 
-A Discord bot that monitors stock RSI (Relative Strength Index) levels and sends alerts when stocks cross configured thresholds. Designed for Norwegian stocks with Nordnet integration.
+A Discord bot that monitors stock RSI (Relative Strength Index) levels and sends alerts when stocks cross configured thresholds. Designed for Norwegian stocks with TradingView integration.
 
 ## Features
 
+- **Switchable RSI Providers**: Choose between TradingView Screener (default) or yfinance for RSI data
 - **RSI Alerts**: Get notified when stocks cross oversold (RSI < 30) or overbought (RSI > 70) thresholds
 - **Crossing Detection**: Smart alert system that only triggers when RSI crosses a threshold (not every day it stays beyond)
+- **Hourly Auto-Scans**: Automatic RSI scanning during market hours for Europe (09:30-17:30) and US/Canada (15:30-22:30)
+- **Daily Change Detection**: Only posts to alert channels when the set of qualifying tickers changes
 - **Fixed Alert Channels**: Alerts automatically route to `#rsi-oversold` and `#rsi-overbought`
 - **Slash Commands**: Modern Discord slash command interface
 - **Server-wide Alerts**: All alerts are visible to everyone in the server
@@ -14,6 +17,7 @@ A Discord bot that monitors stock RSI (Relative Strength Index) levels and sends
 - **Batch Processing**: Efficiently handles 300-500 tickers with batched API calls
 - **TradingView Links**: Alert messages include clickable TradingView chart links
 - **Auto-Add Tickers**: Request new tickers in `#request` - bot auto-derives exchange codes
+- **Message Chunking**: Automatically splits long messages to stay under Discord's 2000-character limit
 
 ## Quick Start
 
@@ -51,7 +55,8 @@ export DISCORD_TOKEN=your_bot_token_here
 ### 4. Run the Bot
 
 ```bash
-python main.py
+$env:PYTHONPATH="src"
+python -m bot.main
 ```
 
 ## Slash Commands
@@ -69,10 +74,7 @@ python main.py
 | `/ticker-info` | Look up a ticker (shows RSI, subscriptions) | None |
 | `/catalog-stats` | Show catalog and subscription statistics | None |
 | `/reload-catalog` | Reload tickers.csv | Administrator |
-| `/server-status` | Check server status | None |
-| `/schedule-restart` | Schedule a server restart | Administrator |
-| `/schedule-shutdown` | Schedule a server shutdown | Administrator |
-| `/cancel-scheduled-action` | Cancel scheduled restart/shutdown | Administrator |
+
 
 ### Command Examples
 
@@ -143,19 +145,60 @@ Alerts use a numbered list format with clickable TradingView chart links:
 
 ## Configuration
 
+### RSI Data Provider
+
+The bot supports two RSI data providers. Set via environment variable or in `config.py`:
+
+```bash
+# Use TradingView Screener (default, recommended)
+RSI_PROVIDER=tradingview python main.py
+
+# Use yfinance (fallback)
+RSI_PROVIDER=yfinance python main.py
+```
+
+| Provider | Advantages | Limitations |
+|----------|------------|-------------|
+| **TradingView** (default) | Pre-calculated RSI, fast batch queries | Only RSI14 available |
+| **yfinance** | Any RSI period, full history | Slower, rate limited |
+
+### Automatic Hourly Scans
+
+The bot automatically scans all tickers in the catalog during market hours:
+
+- **European markets**: 09:30 - 17:30 Europe/Oslo (hourly at :30)
+- **US/Canada markets**: 15:30 - 22:30 Europe/Oslo (hourly at :30)
+- Only runs on weekdays (Mon-Fri)
+
+**Daily Change Detection**: To reduce noise, the bot only posts to `#rsi-oversold` and `#rsi-overbought` when:
+1. First scan of the day (always posts if tickers qualify)
+2. The set of qualifying tickers has changed from the previous scan
+
+Status updates are always posted to `#server-changelog` for every scan.
+
+### Auto-Scan Thresholds
+
+Admins can configure auto-scan thresholds per server using `/set-defaults`:
+
+- **auto_oversold**: Oversold threshold for auto-scans (default: 34)
+- **auto_overbought**: Overbought threshold for auto-scans (default: 70)
+
+These are separate from user subscription thresholds and apply only to the hourly automatic scans.
+
 ### tickers.csv
 
 The `tickers.csv` file is the source of truth for valid tickers. Format:
 
 ```csv
-ticker,name,nordnet_slug
-YAR.OL,Yara International ASA,yara-international-yar-xosl
-EQNR.OL,Equinor ASA,equinor-eqnr-xosl
+ticker,name,tradingview_slug
+YAR.OL,Yara International ASA,OSL:YAR
+EQNR.OL,Equinor ASA,OSL:EQNR
+AAPL,Apple Inc.,NASDAQ:AAPL
 ```
 
 - `ticker`: Yahoo Finance ticker symbol (e.g., `*.OL` for Oslo)
 - `name`: Company display name for alerts
-- `nordnet_slug`: URL slug for Nordnet links
+- `tradingview_slug`: TradingView symbol (EXCHANGE:SYMBOL format) for chart links
 
 ### Ticker Format Limits
 
@@ -174,6 +217,8 @@ Admins can configure server defaults with `/set-defaults`:
 - **schedule_time**: Daily check time in HH:MM (default: 18:30, Europe/Oslo)
 - **alert_mode**: `CROSSING` (default) or `LEVEL`
 - **hysteresis**: Buffer to prevent threshold bouncing (default: 2.0)
+- **auto_oversold**: Auto-scan oversold threshold (default: 34)
+- **auto_overbought**: Auto-scan overbought threshold (default: 70)
 
 ## Alert System
 

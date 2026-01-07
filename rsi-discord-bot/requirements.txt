@@ -4,6 +4,7 @@ discord.py>=2.3.0
 # Finance data
 yfinance>=0.2.40
 pandas>=2.0.0
+tradingview-screener>=3.0.0
 
 # Scheduling
 APScheduler>=3.10.0
