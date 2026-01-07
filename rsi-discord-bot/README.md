@@ -12,7 +12,8 @@ A Discord bot that monitors stock RSI (Relative Strength Index) levels and sends
 - **Persistent Storage**: SQLite database survives bot restarts
 - **Cooldown System**: Prevents alert spam with configurable cooldown periods
 - **Batch Processing**: Efficiently handles 300-500 tickers with batched API calls
-- **Nordnet Links**: Alert messages include clickable links to Nordnet
+- **TradingView Links**: Alert messages include clickable TradingView chart links
+- **Auto-Add Tickers**: Request new tickers in `#request` - bot auto-derives exchange codes
 
 ## Quick Start
 
@@ -31,27 +32,14 @@ A Discord bot that monitors stock RSI (Relative Strength Index) levels and sends
 # Clone or download the bot
 cd rsi-discord-bot
 
-#Only for Raspberry Pi OS 32-bit lite
-sudo apt update
-sudo apt install -y python3 python3-pip python3-venv git
-
 # Create virtual environment (recommended)
-python3 -m venv venv
+python -m venv venv
 source venv/bin/activate  # On Windows: venv\Scripts\activate
 
 # Install dependencies
-python3 -m pip install -r requirements.tx
+pip install -r requirements.txt
 ```
 
-On Raspberry Pi OS 32-bit, pip typically uses piwheels, which provides prebuilt wheels for numpy/pandas.
-```bash
-# If numpy/pandas install complains about BLAS/Fortran libs, add:
-sudo apt install -y libgfortran5 libopenblas0-pthread
-
-#If installs are compiling or failing, try:
-python3 -m pip install --upgrade pip
-python3 -m pip install --extra-index-url https://www.piwheels.org/simple -r requirements.txt
-```
 ### 3. Configuration
 
 Set your Discord bot token:
@@ -63,7 +51,7 @@ export DISCORD_TOKEN=your_bot_token_here
 ### 4. Run the Bot
 
 ```bash
-python3 main.py
+python main.py
 ```
 
 ## Slash Commands
@@ -141,13 +129,13 @@ The bot uses **two fixed channels** for alerts (no channel selection needed):
 
 ## Alert Message Format
 
-Alerts use a numbered list format with clickable Nordnet links:
+Alerts use a numbered list format with clickable TradingView chart links:
 
 ```
 📈 **RSI Overbought Alerts**
 
-1) **AUSS.OL** — [Austevoll Seafood](https://www.nordnet.no/aksjer/kurser/austevoll-seafood-auss-xosl) — RSI14: **79.6** | Rule: **> 70.0** | ⏱️ **day 4**
-2) **NHY.OL** — [Norsk Hydro](https://www.nordnet.no/aksjer/kurser/norsk-hydro-nhy-xosl) — RSI14: **78.3** | Rule: **> 70.0** | 🆕 **just crossed**
+1) **AUSS.OL** — [Austevoll Seafood](https://www.tradingview.com/chart/?symbol=OSL:AUSS&interval=1D) — RSI14: **79.6** | Rule: **> 70.0** | ⏱️ **day 4**
+2) **NHY.OL** — [Norsk Hydro](https://www.tradingview.com/chart/?symbol=OSL:NHY&interval=1D) — RSI14: **78.3** | Rule: **> 70.0** | 🆕 **just crossed**
 ```
 
 - **🆕 just crossed** — First day the condition is met
@@ -240,25 +228,52 @@ rsi-discord-bot/
 ├── tickers.csv          # Instrument catalog
 ├── requirements.txt     # Python dependencies
 ├── rsi_bot.db          # SQLite database (created on first run)
-└── rsi_bot.log         # Log file
+├── rsi_bot.log         # Log file
+└── refdata/            # Exchange lookup reference data
+    ├── exchange_code_yahoo_suffix.csv  # Yahoo suffix → exchange mapping
+    ├── nasdaqlisted.txt                # NASDAQ symbols
+    └── otherlisted.txt                 # Other US exchange symbols
 ```
+
+### tickers.csv Format
+
+```csv
+ticker,name,tradingview_slug
+YAR.OL,Yara International ASA,OSL:YAR
+EQNR.OL,Equinor ASA,OSL:EQNR
+AAPL,Apple Inc.,NASDAQ:AAPL
+```
+
+- `ticker`: Yahoo Finance ticker (used for data fetching)
+- `name`: Company display name
+- `tradingview_slug`: `EXCHANGE:SYMBOL` format for TradingView chart links
 
 ## Auto-Add Tickers (#request channel)
 
-Users can request new tickers by posting in `#request` with this format:
+Users can request new tickers by posting in `#request` with this simple 2-line format:
 
 ```
 https://finance.yahoo.com/quote/CINT.ST/
 Cint Group AB
-https://www.nordnet.no/aksjer/kurser/cint-group-cint-xsto
 ```
 
 The bot will:
-1. Parse the Yahoo Finance URL for the ticker symbol
-2. Use line 2 as the company name
-3. Extract the Nordnet slug from the URL
+1. Parse the Yahoo Finance URL for the ticker symbol (`CINT.ST`)
+2. Use line 2 as the company name (`Cint Group AB`)
+3. **Auto-derive** the TradingView slug from reference data (`STO:CINT`)
 4. Add to `tickers.csv` if not already present
-5. Reply with confirmation
+5. Reply with confirmation including the TradingView link
+
+**No manual exchange selection needed!** The bot uses reference data files in `refdata/` to automatically map:
+- Yahoo suffixes (`.OL`, `.ST`, `.TO`, etc.) to exchange codes
+- US stocks (no suffix) to NASDAQ, NYSE, etc.
+
+### Reference Data Files
+
+Located in `refdata/`:
+- `exchange_code_yahoo_suffix.csv` - Maps Yahoo suffixes to TradingView exchange codes
+- `nasdaqlisted.txt` - NASDAQ-listed US symbols
+- `otherlisted.txt` - Other US exchange symbols (NYSE, AMEX, etc.)
 
 ## Subscription Ownership
 
@@ -270,8 +285,6 @@ The bot will:
 
 Optional server health monitoring and control features.
 
-If you don’t set `SERVER_HEALTH_URL`, monitoring features will remain inactive; you only need restart/shutdown scripts if you intend to use admin server-control commands
-
 ### Environment Variables
 
 ```bash
@@ -281,12 +294,6 @@ SERVER_HEALTH_URL=http://localhost:8080/health
 # Server control scripts (admin commands)
 SERVER_RESTART_SCRIPT=/opt/scripts/restart_server.sh
 SERVER_SHUTDOWN_SCRIPT=/opt/scripts/shutdown_server.sh
-```
-Windows:
-```bash
-$env:SERVER_HEALTH_URL = "http://localhost:8080/health"
-$env:SERVER_RESTART_SCRIPT = "C:\opt\scripts\restart_server.ps1"
-$env:SERVER_SHUTDOWN_SCRIPT = "C:\opt\scripts\shutdown_server.ps1"
 ```
 
 ### Features

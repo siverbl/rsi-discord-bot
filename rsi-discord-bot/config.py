@@ -27,16 +27,19 @@ DEFAULT_HYSTERESIS = 2.0
 DEFAULT_ALERT_MODE = "CROSSING"  # CROSSING or LEVEL
 
 # Data fetching
-BATCH_SIZE = 50
-BATCH_DELAY_SECONDS = 3
+BATCH_SIZE = 100
+BATCH_DELAY_SECONDS = 1.5
 PRICE_HISTORY_PERIOD = "1y"
 MIN_DATA_POINTS = 15  # Minimum data points needed for RSI calculation
 
 # Discord rate limits
 MAX_ALERTS_PER_MESSAGE = 25
 
-# Nordnet URL template
-NORDNET_URL_TEMPLATE = "https://www.nordnet.no/aksjer/kurser/{nordnet_slug}"
+# TradingView URL template (replaced Nordnet)
+TRADINGVIEW_URL_TEMPLATE = "https://www.tradingview.com/chart/?symbol={tradingview_slug}&interval=1D"
+
+# Reference data directory for exchange lookups
+REFDATA_DIR = BASE_DIR / "refdata"
 
 # Fixed alert channel names (no channel selection - automatic routing)
 OVERSOLD_CHANNEL_NAME = "rsi-oversold"   # For UNDER alerts

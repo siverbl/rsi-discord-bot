@@ -8,7 +8,7 @@ from typing import Dict, Optional, List
 from dataclasses import dataclass
 from pathlib import Path
 
-from config import TICKERS_FILE, NORDNET_URL_TEMPLATE
+from config import TICKERS_FILE, TRADINGVIEW_URL_TEMPLATE
 
 logger = logging.getLogger(__name__)
 
@@ -18,12 +18,12 @@ class Instrument:
     """Represents an instrument from the ticker catalog."""
     ticker: str
     name: str
-    nordnet_slug: str
+    tradingview_slug: str  # Format: EXCHANGE:TICKER (e.g., OSL:EQNR)
 
     @property
-    def nordnet_url(self) -> str:
-        """Generate the Nordnet URL for this instrument."""
-        return NORDNET_URL_TEMPLATE.format(nordnet_slug=self.nordnet_slug)
+    def tradingview_url(self) -> str:
+        """Generate the TradingView chart URL for this instrument."""
+        return TRADINGVIEW_URL_TEMPLATE.format(tradingview_slug=self.tradingview_slug)
 
 
 class TickerCatalog:
@@ -31,7 +31,7 @@ class TickerCatalog:
     Manages the instrument catalog loaded from tickers.csv.
     
     The CSV file must have a header row with columns:
-    ticker,name,nordnet_slug
+    ticker,name,tradingview_slug
     """
     
     def __init__(self, csv_path: Path = TICKERS_FILE):
@@ -57,7 +57,7 @@ class TickerCatalog:
                 reader = csv.DictReader(csvfile)
                 
                 # Validate required columns
-                required_columns = {'ticker', 'name', 'nordnet_slug'}
+                required_columns = {'ticker', 'name', 'tradingview_slug'}
                 if not reader.fieldnames:
                     logger.error("Ticker catalog has no header row")
                     return False
@@ -73,19 +73,19 @@ class TickerCatalog:
                     line_num += 1
                     ticker = row.get('ticker', '').strip().upper()
                     name = row.get('name', '').strip()
-                    nordnet_slug = row.get('nordnet_slug', '').strip()
+                    tradingview_slug = row.get('tradingview_slug', '').strip()
 
                     if not ticker or not name:
                         logger.warning(f"Skipping line {line_num}: missing ticker or name")
                         continue
 
-                    if not nordnet_slug:
-                        logger.warning(f"Ticker {ticker} has no nordnet_slug")
+                    if not tradingview_slug:
+                        logger.warning(f"Ticker {ticker} has no tradingview_slug")
 
                     self._instruments[ticker] = Instrument(
                         ticker=ticker,
                         name=name,
-                        nordnet_slug=nordnet_slug
+                        tradingview_slug=tradingview_slug
                     )
 
             self._loaded = True
@@ -117,11 +117,11 @@ class TickerCatalog:
         instrument = self.get_instrument(ticker)
         return instrument.name if instrument else ticker
 
-    def get_nordnet_url(self, ticker: str) -> str:
-        """Get the Nordnet URL for a ticker."""
+    def get_tradingview_url(self, ticker: str) -> str:
+        """Get the TradingView URL for a ticker."""
         instrument = self.get_instrument(ticker)
-        if instrument and instrument.nordnet_slug:
-            return instrument.nordnet_url
+        if instrument and instrument.tradingview_slug:
+            return instrument.tradingview_url
         return ""
 
     def get_all_tickers(self) -> List[str]:

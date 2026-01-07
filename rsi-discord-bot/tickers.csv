@@ -1,94 +1,92 @@
-ticker,name,nordnet_slug
-YAR.OL,Yara International ASA,yara-international-yar-xosl
-EQNR.OL,Equinor ASA,equinor-eqnr-xosl
-SALM.OL,SalMar ASA,salmar-salm-xosl
-DNB.OL,DNB Bank ASA,dnb-dnb-xosl
-TEL.OL,Telenor ASA,telenor-tel-xosl
-MOWI.OL,Mowi ASA,mowi-mowi-xosl
-ORK.OL,Orkla ASA,orkla-ork-xosl
-AKRBP.OL,Aker BP ASA,aker-bp-akrbp-xosl
-NHY.OL,Norsk Hydro ASA,norsk-hydro-nhy-xosl
-SUBC.OL,Subsea 7 SA,subsea-7-subc-xosl
-STB.OL,Storebrand ASA,storebrand-stb-xosl
-KOG.OL,Kongsberg Gruppen ASA,kongsberg-gruppen-kog-xosl
-AKER.OL,Aker ASA,aker-aker-xosl
-GJF.OL,Gjensidige Forsikring ASA,gjensidige-forsikring-gjf-xosl
-TOM.OL,Tomra Systems ASA,tomra-systems-tom-xosl
-BAKKA.OL,Bakkafrost P/F,bakkafrost-bakka-xosl
-SCHB.OL,Schibsted ASA Class B,schibsted-schb-xosl
-AUSS.OL,Austevoll Seafood ASA,austevoll-seafood-auss-xosl
-SCHA.OL,Schibsted ASA Class A,schibsted-scha-xosl
-FRO.OL,Frontline Ltd,frontline-fro-xosl
-BWO.OL,BW Offshore Ltd,bw-offshore-bwo-xosl
-AKSO.OL,Aker Solutions ASA,aker-solutions-akso-xosl
-GOGL.OL,Golden Ocean Group Ltd,golden-ocean-group-gogl-xosl
-VAR.OL,Vår Energi ASA,var-energi-var-xosl
-HAFNI.OL,Hafnia Ltd,hafnia-hafni-xosl
-SOFF.OL,Solstad Offshore ASA,solstad-offshore-soff-xosl
-PARB.OL,Pareto Bank ASA,pareto-bank-parb-xosl
-NOD.OL,Nordic Semiconductor ASA,nordic-semiconductor-nod-xosl
-VOLUE.OL,Volue ASA,volue-volue-xosl
-ENTRA.OL,Entra ASA,entra-entra-xosl
-FLNG.OL,Flex LNG Ltd,flex-lng-flng-xosl
-KIT.OL,Kitron ASA,kitron-kit-xosl
-RECSI.OL,REC Silicon ASA,rec-silicon-recsi-xosl
-AUTO.OL,Autostore Holdings Ltd,autostore-auto-xosl
-KAHOT.OL,Kahoot! ASA,kahoot-kahot-xosl
-PGS.OL,PGS ASA,pgs-pgs-xosl
-ELMERA.OL,Elmera Group ASA,elmera-group-elmera-xosl
-MPCC.OL,MPC Container Ships ASA,mpc-container-ships-mpcc-xosl
-BORR.OL,Borr Drilling Ltd,borr-drilling-borr-xosl
-OTS.OL,Odfjell Technology Ltd,odfjell-technology-ots-xosl
-BWLPG.OL,BW LPG Ltd,bw-lpg-bwlpg-xosl
-AKH.OL,Akastor ASA,akastor-akh-xosl
-PROT.OL,Protector Forsikring ASA,protector-forsikring-prot-xosl
-ZAL.OL,Zalaris ASA,zalaris-zal-xosl
-ASTK.OL,Aker Clean Hydrogen AS,aker-clean-hydrogen-astk-xosl
-QFR.OL,Quantafuel ASA,quantafuel-qfr-xosl
-NEL.OL,Nel ASA,nel-nel-xosl
-LINK.OL,Link Mobility Group Holding ASA,link-mobility-group-holding-link-xosl
-XXL.OL,XXL ASA,xxl-xxl-xosl
-ACR.OL,Axactor ASA,axactor-acr-xosl
-NOVO-B.CO,Novo Nordisk A/S B,novo-nordisk-b-novo-b-xcse
-AREC,American Resources Corporation,american-resources-a-arec-xnas
-AEC.V,Anfield Energy Inc.,anfield-energy-aec-xtsx
-SB1NO.OL,SpareBank 1 Sør-Norge ASA,spare-bank-1-sor-norge-sb1no-xosl
-MING.OL,SpareBank 1 SMN,sparebank-1-smn-ming-xosl
-NONG.OL,SpareBank 1 Nord-Norge,sparebank-1-nord-norge-nong-xosl
-SPOL.OL,SpareBank 1 Østlandet,sparebank-1-ostlandet-spol-xosl
-SOAG.OL,SpareBank 1 Østfold Akershus,sparebank-1-ostfold-akershus-soag-xosl
-HELG.OL,SpareBank 1 Helgeland,sparebank-1-helgeland-helg-xosl
-SNOR.OL,SpareBank 1 Nordmøre,sparebank-1-nordmore-snor-xosl
-RING.OL,SpareBank 1 Ringerike Hadeland,sparebank-1-ringerike-hadeland-ring-xosl
-SBNOR.OL,Sparebanken Norge,sparebanken-norge-sbnor-xosl
-SPOG.OL,Sparebanken Øst,sparebanken-ost-spog-xosl
-MORG.OL,Sparebanken Møre,sparebanken-more-morg-xosl
-HGSB.OL,Haugesund Sparebank,haugesund-sparebank-hgsb-xosl
-AURG.OL,Aurskog Sparebank,aurskog-sparebank-aurg-xosl
-ROGS.OL,Rogaland Sparebank,rogaland-sparebank-rogs-xosl
-JAREN.OL,Jæren Sparebank,jaeren-sparebank-jaren-xosl
-BIEN.OL,Bien Sparebank ASA,bien-sparebank-asa-bien-xosl
-HSPG.OL,Høland og Setskog Sparebank,holand-og-setskog-sparebank-hspg-xosl
-SKUE.OL,Skue Sparebank,skue-sparebank-skue-xosl
-VVL.OL,Voss Veksel- og Landmandsbank,voss-veksel-og-landmandsbank-vvl-xosl
-SOGN.OL,Sogn Sparebank,sogn-sparebank-sogn-xosl
-TRSB.OL,Trøndelag Sparebank,trondelag-sparebank-trsb-xosl
-AKSO.OL,Aker Solutions ASA,aker-solutions-akso-xosl
-CINT.ST,Cint Group AB,cint-group-cint-xsto
-PRS.OL,Prosafe,prosafe-prs-xosl
-TGS.OL,TGS,tgs-xosl
-SATS.OL,SATS,sats-xosl
-NAPA.OL,Napatech,napatech-napa-xosl
-BETS-B.ST,Betsson B,betsson-b-bets-b-xsto
-HPQ,HP,hp-hpq-xnas
-KLAR,Klarna Group,klarna-group-klar-xnas
-MRSELL.ST,mResell,m-resell-mrsell-xsat
-MODTX.ST,Modus Therapeutics,modus-therapeutics-modtx-ssme
-SIN.ST,Solution International Nordics AB,solution-international-sin-xsat
-PYPL,PayPal Holdings,pay-pal-pypl-xnas
-KFR.V,Kingfisher Metals,kingfisher-metals-kfr-xtsx
-DVLT,Datavault AI,datavault-ai-dvlt-xnas
-FARON.HE,Faron Pharmaceuticals,faron-pharmaceuticals-faron-fsme
-FIG,Figma,figma-fig-xnas
-NFLX,Netflix,netflix-nflx-xnas
-BOUV.OL,Bouvet,bouvet-bouv-xosl
+ticker,name,tradingview_slug
+YAR.OL,Yara International ASA,OSL:YAR
+EQNR.OL,Equinor ASA,OSL:EQNR
+SALM.OL,SalMar ASA,OSL:SALM
+DNB.OL,DNB Bank ASA,OSL:DNB
+TEL.OL,Telenor ASA,OSL:TEL
+MOWI.OL,Mowi ASA,OSL:MOWI
+ORK.OL,Orkla ASA,OSL:ORK
+AKRBP.OL,Aker BP ASA,OSL:AKRBP
+NHY.OL,Norsk Hydro ASA,OSL:NHY
+SUBC.OL,Subsea 7 SA,OSL:SUBC
+STB.OL,Storebrand ASA,OSL:STB
+KOG.OL,Kongsberg Gruppen ASA,OSL:KOG
+AKER.OL,Aker ASA,OSL:AKER
+GJF.OL,Gjensidige Forsikring ASA,OSL:GJF
+TOM.OL,Tomra Systems ASA,OSL:TOM
+BAKKA.OL,Bakkafrost P/F,OSL:BAKKA
+AUSS.OL,Austevoll Seafood ASA,OSL:AUSS
+FRO.OL,Frontline Ltd,OSL:FRO
+BWO.OL,BW Offshore Ltd,OSL:BWO
+AKSO.OL,Aker Solutions ASA,OSL:AKSO
+GOGL.OL,Golden Ocean Group Ltd,OSL:GOGL
+VAR.OL,Vår Energi ASA,OSL:VAR
+HAFNI.OL,Hafnia Ltd,OSL:HAFNI
+SOFF.OL,Solstad Offshore ASA,OSL:SOFF
+PARB.OL,Pareto Bank ASA,OSL:PARB
+NOD.OL,Nordic Semiconductor ASA,OSL:NOD
+ENTRA.OL,Entra ASA,OSL:ENTRA
+FLNG.OL,Flex LNG Ltd,OSL:FLNG
+KIT.OL,Kitron ASA,OSL:KIT
+RECSI.OL,REC Silicon ASA,OSL:RECSI
+AUTO.OL,Autostore Holdings Ltd,OSL:AUTO
+KAHOT.OL,Kahoot! ASA,OSL:KAHOT
+ELMERA.OL,Elmera Group ASA,OSL:ELMERA
+MPCC.OL,MPC Container Ships ASA,OSL:MPCC
+BORR.OL,Borr Drilling Ltd,OSL:BORR
+OTL.OL,Odfjell Technology Ltd,OSL:OTL
+BWLPG.OL,BW LPG Ltd,OSL:BWLPG
+AKAST.OL,Akastor ASA,OSL:AKAST
+PROT.OL,Protector Forsikring ASA,OSL:PROT
+ZAL.OL,Zalaris ASA,OSL:ZAL
+NEL.OL,Nel ASA,OSL:NEL
+LINK.OL,Link Mobility Group Holding ASA,OSL:LINK
+ACR.OL,Axactor ASA,OSL:ACR
+NOVO-B.CO,Novo Nordisk A/S B,OMXCOP:NOVO_B
+AREC,American Resources Corporation,NASDAQ:AREC
+AEC.V,Anfield Energy Inc.,TSXV:AEC
+SB1NO.OL,SpareBank 1 Sør-Norge ASA,OSL:SB1NO
+MING.OL,SpareBank 1 SMN,OSL:MING
+NONG.OL,SpareBank 1 Nord-Norge,OSL:NONG
+SPOL.OL,SpareBank 1 Østlandet,OSL:SPOL
+SOAG.OL,SpareBank 1 Østfold Akershus,OSL:SOAG
+HELG.OL,SpareBank 1 Helgeland,OSL:HELG
+SNOR.OL,SpareBank 1 Nordmøre,OSL:SNOR
+RING.OL,SpareBank 1 Ringerike Hadeland,OSL:RING
+SBNOR.OL,Sparebanken Norge,OSL:SBNOR
+SPOG.OL,Sparebanken Øst,OSL:SPOG
+MORG.OL,Sparebanken Møre,OSL:MORG
+HGSB.OL,Haugesund Sparebank,OSL:HGSB
+AURG.OL,Aurskog Sparebank,OSL:AURG
+ROGS.OL,Rogaland Sparebank,OSL:ROGS
+JAREN.OL,Jæren Sparebank,OSL:JAREN
+BIEN.OL,Bien Sparebank ASA,OSL:BIEN
+HSPG.OL,Høland og Setskog Sparebank,OSL:HSPG
+SKUE.OL,Skue Sparebank,OSL:SKUE
+VVL.OL,Voss Veksel- og Landmandsbank,OSL:VVL
+SOGN.OL,Sogn Sparebank,OSL:SOGN
+TRSB.OL,Trøndelag Sparebank,OSL:TRSB
+AKSO.OL,Aker Solutions ASA,OSL:AKSO
+CINT.ST,Cint Group AB,OMXSTO:CINT
+PRS.OL,Prosafe,OSL:PRS
+TGS.OL,TGS,OSL:TGS
+SATS.OL,SATS,OSL:SATS
+NAPA.OL,Napatech,OSL:NAPA
+BETS-B.ST,Betsson B,OMXSTO:BETS_B
+HPQ,HP,NYSE:HPQ
+KLAR,Klarna Group,NYSE:KLAR
+MRSELL.ST,mResell,NGM:MRSELL
+MODTX.ST,Modus Therapeutics,OMXSTO:MODTX
+SIN.ST,Solution International Nordics AB,NGM:SIN
+PYPL,PayPal Holdings,NASDAQ:PYPL
+KFR.V,Kingfisher Metals,TSXV:KFR
+DVLT,Datavault AI,NASDAQ:DVLT
+FARON.HE,Faron Pharmaceuticals,OMXHEX:FARON
+FIG,Figma,NYSE:FIG
+NFLX,Netflix,NASDAQ:NFLX
+BOUV.OL,Bouvet,OSL:BOUV
+TSLA,Tesla,NASDAQ:TSLA
+SHEL.L,Shell,LSE:SHEL
+SNDK,Sandisk Corporation,NASDAQ:SNDK
+AIG,American International Group,NYSE:AIG
+BABA,Alibaba Group Holding Limited,NYSE:BABA

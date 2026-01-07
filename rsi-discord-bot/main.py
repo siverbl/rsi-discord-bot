@@ -931,7 +931,7 @@ async def ticker_info(
     # Build response
     lines = [
         f"**{instrument.ticker} — {instrument.name}**",
-        f"🔗 [Nordnet]({instrument.nordnet_url})",
+        f"🔗 [TradingView]({instrument.tradingview_url})",
         ""
     ]
 

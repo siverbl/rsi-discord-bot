@@ -29,7 +29,7 @@ class Alert:
     rsi_value: float
     last_date: str
     last_close: float
-    nordnet_url: str
+    tradingview_url: str
     days_in_zone: int
     just_crossed: bool  # True if this is the first day crossing
     previous_rsi: Optional[float] = None
@@ -213,7 +213,7 @@ class AlertEngine:
             # Get instrument details
             instrument = self.catalog.get_instrument(ticker)
             name = instrument.name if instrument else ticker
-            nordnet_url = instrument.nordnet_url if instrument else ""
+            tradingview_url = instrument.tradingview_url if instrument else ""
 
             return Alert(
                 subscription_id=subscription_id,
@@ -227,7 +227,7 @@ class AlertEngine:
                 rsi_value=current_rsi,
                 last_date=rsi_result.last_date,
                 last_close=rsi_result.last_close,
-                nordnet_url=nordnet_url,
+                tradingview_url=tradingview_url,
                 days_in_zone=new_days_in_zone,
                 just_crossed=just_crossed,
                 previous_rsi=last_rsi
@@ -312,7 +312,7 @@ def format_single_alert(alert: Alert, index: int) -> str:
     Format a single alert line in the required format.
     
     Example:
-    1) **AUSS.OL** — [Austevoll Seafood](https://nordnet.no/...) — RSI14: **79.6** | Rule: **> 70.0** | ⏱️ **day 4**
+    1) **AUSS.OL** — [Austevoll Seafood](https://tradingview.com/...) — RSI14: **79.6** | Rule: **> 70.0** | ⏱️ **day 4**
     """
     # Determine rule symbol
     rule_symbol = "<" if alert.condition == "UNDER" else ">"
@@ -326,7 +326,7 @@ def format_single_alert(alert: Alert, index: int) -> str:
     # Format the line
     line = (
         f"{index}) **{alert.ticker}** — "
-        f"[{alert.name}]({alert.nordnet_url}) — "
+        f"[{alert.name}]({alert.tradingview_url}) — "
         f"RSI{alert.period}: **{alert.rsi_value:.1f}** | "
         f"Rule: **{rule_symbol} {alert.threshold}** | "
         f"{persistence}"
