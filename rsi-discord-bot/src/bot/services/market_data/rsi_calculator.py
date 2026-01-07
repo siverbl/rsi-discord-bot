@@ -12,7 +12,7 @@ from concurrent.futures import ThreadPoolExecutor
 import pandas as pd
 import yfinance as yf
 
-from config import BATCH_SIZE, BATCH_DELAY_SECONDS, PRICE_HISTORY_PERIOD, MIN_DATA_POINTS
+from bot.config import BATCH_SIZE, BATCH_DELAY_SECONDS, PRICE_HISTORY_PERIOD, MIN_DATA_POINTS
 
 logger = logging.getLogger(__name__)
 

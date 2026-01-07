@@ -8,7 +8,7 @@ from typing import Dict, Optional, List
 from dataclasses import dataclass
 from pathlib import Path
 
-from config import TICKERS_FILE, TRADINGVIEW_URL_TEMPLATE
+from bot.config import TICKERS_FILE, TRADINGVIEW_URL_TEMPLATE
 
 logger = logging.getLogger(__name__)
 

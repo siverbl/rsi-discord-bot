@@ -4,13 +4,12 @@ Handles alert trigger logic including crossing detection, cooldown, and hysteres
 """
 import logging
 from datetime import datetime, timedelta
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional
 from dataclasses import dataclass
-from collections import defaultdict
 
-from database import Database, Subscription, SubscriptionState, GuildConfig
-from rsi_calculator import RSIResult
-from ticker_catalog import get_catalog
+from bot.repositories.database import Database, GuildConfig
+from bot.services.market_data.rsi_calculator import RSIResult
+from bot.repositories.ticker_catalog import get_catalog
 
 logger = logging.getLogger(__name__)
 

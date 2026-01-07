@@ -12,31 +12,27 @@ Usage:
 Or:
     DISCORD_TOKEN=your_bot_token python main.py
 """
-import asyncio
 import logging
 import sys
-from datetime import datetime, timedelta
 from typing import Optional, Tuple
+from pathlib import Path
 
 import discord
-import pytz
 from discord import app_commands
 from discord.ext import commands
-from health_server import start_health_server
 
-from config import (
-    DISCORD_TOKEN, DEFAULT_RSI_PERIOD, DEFAULT_OVERSOLD_THRESHOLD,
-    DEFAULT_OVERBOUGHT_THRESHOLD, DEFAULT_COOLDOWN_HOURS,
-    OVERSOLD_CHANNEL_NAME, OVERBOUGHT_CHANNEL_NAME,
-    CHANGELOG_CHANNEL_NAME, REQUEST_CHANNEL_NAME, DEFAULT_TIMEZONE
+
+from bot.config import (
+    DISCORD_TOKEN, DEFAULT_OVERSOLD_THRESHOLD,
+    DEFAULT_OVERBOUGHT_THRESHOLD, OVERSOLD_CHANNEL_NAME, OVERBOUGHT_CHANNEL_NAME,
+    CHANGELOG_CHANNEL_NAME, REQUEST_CHANNEL_NAME, LOG_PATH
 )
-from database import Database
-from ticker_catalog import get_catalog, validate_ticker
-from rsi_calculator import RSICalculator
-from alert_engine import AlertEngine, format_alert_list, format_no_alerts_message
-from scheduler import RSIScheduler
-from ticker_request import TickerRequestCog, handle_request_message
-from server_monitor import ServerMonitor, ActionType, log_admin_action
+from bot.repositories.database import Database
+from bot.repositories.ticker_catalog import get_catalog, validate_ticker
+from bot.services.market_data.rsi_calculator import RSICalculator
+from bot.cogs.alert_engine import AlertEngine, format_alert_list, format_no_alerts_message
+from bot.services.scheduler import RSIScheduler
+from bot.cogs.ticker_request import TickerRequestCog, handle_request_message
 
 # Configure logging
 logging.basicConfig(
@@ -44,7 +40,7 @@ logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     handlers=[
         logging.StreamHandler(sys.stdout),
-        logging.FileHandler('rsi_bot.log')
+        logging.FileHandler(LOG_PATH, encoding="utf-8")
     ]
 )
 logger = logging.getLogger(__name__)
@@ -117,7 +113,6 @@ class RSIBot(commands.Bot):
         self.rsi_calculator = RSICalculator()
         self.alert_engine = AlertEngine(self.db)
         self.scheduler: Optional[RSIScheduler] = None
-        self.server_monitor: Optional[ServerMonitor] = None
         self.ticker_request_handler = TickerRequestCog(self)
 
         self.health_runner = None  # add this
@@ -133,17 +128,6 @@ class RSIBot(commands.Bot):
         logger.info("Starting scheduler...")
         self.scheduler = RSIScheduler(self)
         await self.scheduler.start()
-
-        logger.info("Starting local health server (localhost-only)...")
-        try:
-            self.health_runner = await start_health_server(host="127.0.0.1", port=8080)
-        except OSError as e:
-            logger.error(f"Failed to start health server on 127.0.0.1:8080: {e}")
-            # Optional: if you want, disable server monitor here or let it warn.
-
-        logger.info("Starting server monitor...")
-        self.server_monitor = ServerMonitor(self)
-        await self.server_monitor.start()
 
         logger.info("Syncing slash commands...")
         await self.tree.sync()
@@ -188,9 +172,6 @@ class RSIBot(commands.Bot):
         """Clean shutdown."""
         if self.scheduler:
             self.scheduler.stop()
-        if self.server_monitor:
-            await self.server_monitor.stop()
-
         if self.health_runner:
             await self.health_runner.cleanup()
 
@@ -622,14 +603,6 @@ async def admin_unsubscribe(
         if reason:
             log_details += f"\nReason: {reason}"
 
-        await log_admin_action(
-            bot,
-            "Unsubscribe Override",
-            interaction.user.id,
-            str(interaction.user),
-            log_details
-        )
-
         await interaction.followup.send(
             f"✅ **Subscription removed by admin** (ID: `{id}`)\n"
             f"• **Ticker:** {sub.ticker} — {name}\n"
@@ -950,7 +923,7 @@ async def ticker_info(
             state = await bot.db.get_subscription_state(sub.id)
             if state and state.last_rsi is not None and state.last_date:
                 # Check if data is fresh (within 24 hours based on last_date)
-                from datetime import datetime, timedelta
+                from datetime import datetime
                 try:
                     last_date = datetime.strptime(state.last_date, "%Y-%m-%d")
                     days_old = (datetime.now() - last_date).days
@@ -1034,271 +1007,6 @@ async def catalog_stats(interaction: discord.Interaction):
         f"• `#{OVERBOUGHT_CHANNEL_NAME}` — OVER alerts",
         ephemeral=True
     )
-
-
-# ==================== Server Control Commands ====================
-
-@bot.tree.command(name="server-status", description="Check server status and scheduled actions")
-async def server_status(interaction: discord.Interaction):
-    """Get current server status."""
-    await interaction.response.defer(ephemeral=True)
-
-    if not bot.server_monitor:
-        await interaction.followup.send(
-            "❌ Server monitoring is not enabled.",
-            ephemeral=True
-        )
-        return
-
-    status = bot.server_monitor.get_status()
-    
-    # Format status
-    status_emoji = {
-        "online": "🟢",
-        "offline": "🔴",
-        "unknown": "⚪"
-    }
-    
-    lines = [
-        f"{status_emoji.get(status['status'], '⚪')} **Server Status: {status['status'].upper()}**",
-        ""
-    ]
-    
-    if status['last_check']:
-        lines.append(f"• Last check: {status['last_check']}")
-    
-    if status['last_change']:
-        lines.append(f"• Last status change: {status['last_change']}")
-    
-    if status['scheduled_action']:
-        action = status['scheduled_action']
-        lines.append("")
-        lines.append(f"⏰ **Scheduled {action['type'].capitalize()}:**")
-        lines.append(f"• Time: {action['time']}")
-        lines.append(f"• Scheduled by: {action['by']}")
-        if action['reason']:
-            lines.append(f"• Reason: {action['reason']}")
-
-    await interaction.followup.send("\n".join(lines), ephemeral=True)
-
-
-@bot.tree.command(name="schedule-restart", description="[Admin] Schedule a server restart")
-@app_commands.default_permissions(administrator=True)
-@app_commands.describe(
-    minutes="Minutes from now to restart (use this OR time, not both)",
-    time="Specific time to restart (HH:MM format, Europe/Oslo timezone)",
-    reason="Reason for restart (optional)"
-)
-async def schedule_restart(
-    interaction: discord.Interaction,
-    minutes: Optional[int] = None,
-    time: Optional[str] = None,
-    reason: Optional[str] = None
-):
-    """Schedule a server restart."""
-    await interaction.response.defer(ephemeral=True)
-
-    # Check admin permission
-    if not interaction.user.guild_permissions.administrator:
-        await interaction.followup.send(
-            "❌ **Permission Denied**\nThis command requires Administrator permission.",
-            ephemeral=True
-        )
-        return
-
-    if not bot.server_monitor:
-        await interaction.followup.send(
-            "❌ Server monitoring is not enabled.",
-            ephemeral=True
-        )
-        return
-
-    # Validate input - must have exactly one of minutes or time
-    if (minutes is None) == (time is None):
-        await interaction.followup.send(
-            "❌ Please provide either `minutes` OR `time`, not both or neither.",
-            ephemeral=True
-        )
-        return
-
-    # Calculate scheduled time
-    tz = pytz.timezone(DEFAULT_TIMEZONE)
-    now = datetime.now(tz)
-    
-    if minutes is not None:
-        if minutes <= 0:
-            await interaction.followup.send(
-                "❌ Minutes must be a positive number.",
-                ephemeral=True
-            )
-            return
-        scheduled_time = now + timedelta(minutes=minutes)
-    else:
-        try:
-            # Parse HH:MM format
-            hour, minute = map(int, time.split(":"))
-            scheduled_time = now.replace(hour=hour, minute=minute, second=0, microsecond=0)
-            # If time is in the past today, schedule for tomorrow
-            if scheduled_time <= now:
-                scheduled_time += timedelta(days=1)
-        except (ValueError, AttributeError):
-            await interaction.followup.send(
-                "❌ Invalid time format. Use HH:MM (e.g., 18:30).",
-                ephemeral=True
-            )
-            return
-
-    # Schedule the restart
-    success, message = await bot.server_monitor.schedule_action(
-        action_type=ActionType.RESTART,
-        scheduled_time=scheduled_time,
-        user_id=interaction.user.id,
-        user_name=str(interaction.user),
-        reason=reason
-    )
-
-    await interaction.followup.send(message, ephemeral=True)
-
-
-@bot.tree.command(name="schedule-shutdown", description="[Admin] Schedule a server shutdown")
-@app_commands.default_permissions(administrator=True)
-@app_commands.describe(
-    minutes="Minutes from now to shutdown (use this OR time, not both)",
-    time="Specific time to shutdown (HH:MM format, Europe/Oslo timezone)",
-    reason="Reason for shutdown (optional)"
-)
-async def schedule_shutdown(
-    interaction: discord.Interaction,
-    minutes: Optional[int] = None,
-    time: Optional[str] = None,
-    reason: Optional[str] = None
-):
-    """Schedule a server shutdown."""
-    await interaction.response.defer(ephemeral=True)
-
-    # Check admin permission
-    if not interaction.user.guild_permissions.administrator:
-        await interaction.followup.send(
-            "❌ **Permission Denied**\nThis command requires Administrator permission.",
-            ephemeral=True
-        )
-        return
-
-    if not bot.server_monitor:
-        await interaction.followup.send(
-            "❌ Server monitoring is not enabled.",
-            ephemeral=True
-        )
-        return
-
-    # Validate input - must have exactly one of minutes or time
-    if (minutes is None) == (time is None):
-        await interaction.followup.send(
-            "❌ Please provide either `minutes` OR `time`, not both or neither.",
-            ephemeral=True
-        )
-        return
-
-    # Calculate scheduled time
-    tz = pytz.timezone(DEFAULT_TIMEZONE)
-    now = datetime.now(tz)
-    
-    if minutes is not None:
-        if minutes <= 0:
-            await interaction.followup.send(
-                "❌ Minutes must be a positive number.",
-                ephemeral=True
-            )
-            return
-        scheduled_time = now + timedelta(minutes=minutes)
-    else:
-        try:
-            # Parse HH:MM format
-            hour, minute = map(int, time.split(":"))
-            scheduled_time = now.replace(hour=hour, minute=minute, second=0, microsecond=0)
-            # If time is in the past today, schedule for tomorrow
-            if scheduled_time <= now:
-                scheduled_time += timedelta(days=1)
-        except (ValueError, AttributeError):
-            await interaction.followup.send(
-                "❌ Invalid time format. Use HH:MM (e.g., 18:30).",
-                ephemeral=True
-            )
-            return
-
-    # Schedule the shutdown
-    success, message = await bot.server_monitor.schedule_action(
-        action_type=ActionType.SHUTDOWN,
-        scheduled_time=scheduled_time,
-        user_id=interaction.user.id,
-        user_name=str(interaction.user),
-        reason=reason
-    )
-
-    await interaction.followup.send(message, ephemeral=True)
-
-
-@bot.tree.command(name="cancel-scheduled-action", description="[Admin] Cancel a scheduled restart/shutdown")
-@app_commands.default_permissions(administrator=True)
-async def cancel_scheduled_action(interaction: discord.Interaction):
-    """Cancel a pending restart/shutdown."""
-    await interaction.response.defer(ephemeral=True)
-
-    # Check admin permission
-    if not interaction.user.guild_permissions.administrator:
-        await interaction.followup.send(
-            "❌ **Permission Denied**\nThis command requires Administrator permission.",
-            ephemeral=True
-        )
-        return
-
-    if not bot.server_monitor:
-        await interaction.followup.send(
-            "❌ Server monitoring is not enabled.",
-            ephemeral=True
-        )
-        return
-
-    success, message = await bot.server_monitor.cancel_action(
-        user_id=interaction.user.id,
-        user_name=str(interaction.user)
-    )
-
-    await interaction.followup.send(message, ephemeral=True)
-
-
-@bot.tree.command(name="reload-catalog", description="[Admin] Reload the ticker catalog from tickers.csv")
-@app_commands.default_permissions(administrator=True)
-async def reload_catalog(interaction: discord.Interaction):
-    """Reload the ticker catalog."""
-    await interaction.response.defer(ephemeral=True)
-
-    # Check admin permission
-    if not interaction.user.guild_permissions.administrator:
-        await interaction.followup.send(
-            "❌ **Permission Denied**\nThis command requires Administrator permission.",
-            ephemeral=True
-        )
-        return
-
-    old_count = len(bot.catalog)
-    success = bot.catalog.reload()
-    new_count = len(bot.catalog)
-
-    if success:
-        await interaction.followup.send(
-            f"✅ **Ticker catalog reloaded**\n"
-            f"• Previous: {old_count} instruments\n"
-            f"• Current: {new_count} instruments\n"
-            f"• Change: {new_count - old_count:+d}",
-            ephemeral=True
-        )
-    else:
-        await interaction.followup.send(
-            f"❌ **Failed to reload catalog**\nCheck the logs for details.",
-            ephemeral=True
-        )
-
 
 # ==================== Autocomplete ====================
 

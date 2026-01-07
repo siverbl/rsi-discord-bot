@@ -7,8 +7,9 @@ from datetime import datetime
 from typing import Optional, List, Dict, Any
 from dataclasses import dataclass
 from enum import Enum
+from pathlib import Path
 
-from config import DATABASE_FILE, DEFAULT_RSI_PERIOD, DEFAULT_COOLDOWN_HOURS, DEFAULT_SCHEDULE_TIME, DEFAULT_ALERT_MODE, DEFAULT_HYSTERESIS
+from bot.config import DEFAULT_RSI_PERIOD, DEFAULT_COOLDOWN_HOURS, DEFAULT_SCHEDULE_TIME, DEFAULT_ALERT_MODE, DEFAULT_HYSTERESIS, DB_PATH
 
 
 class Condition(Enum):
@@ -66,8 +67,9 @@ class SubscriptionState:
 
 
 class Database:
-    def __init__(self, db_path: str = str(DATABASE_FILE)):
-        self.db_path = db_path
+    def __init__(self, db_path=DB_PATH):
+        self.db_path = str(db_path)
+        Path(self.db_path).parent.mkdir(parents=True, exist_ok=True)
 
     async def initialize(self):
         """Create database tables if they don't exist."""

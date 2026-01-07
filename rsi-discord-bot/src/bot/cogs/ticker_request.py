@@ -17,7 +17,7 @@ from typing import Optional, Tuple, Dict
 
 import discord
 
-from config import TICKERS_FILE, REQUEST_CHANNEL_NAME, REFDATA_DIR
+from bot.config import TICKERS_FILE, REQUEST_CHANNEL_NAME, REFDATA_DIR
 
 logger = logging.getLogger(__name__)
 
